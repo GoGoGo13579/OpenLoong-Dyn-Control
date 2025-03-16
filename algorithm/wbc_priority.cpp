@@ -410,6 +410,7 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn)
         kin_tasks_walk.taskLib[id].dJ = dJc;
         kin_tasks_walk.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
 
+        // 任务：冗余关节尽量不动，冗余关节指的是头部（2个），腰（3个）
         id = kin_tasks_walk.getId("RedundantJoints");
         kin_tasks_walk.taskLib[id].errX = Eigen::VectorXd::Zero(5);
         kin_tasks_walk.taskLib[id].errX(0) = 0 - q(21);
@@ -422,6 +423,7 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn)
         kin_tasks_walk.taskLib[id].dxDes = Eigen::VectorXd::Zero(5);
         kin_tasks_walk.taskLib[id].kp = Eigen::MatrixXd::Identity(5, 5) * 100;
         kin_tasks_walk.taskLib[id].kd = Eigen::MatrixXd::Identity(5, 5) * 20;
+        // 操作空间就是关节空间
         kin_tasks_walk.taskLib[id].J = Eigen::MatrixXd::Zero(5, model_nv);
         kin_tasks_walk.taskLib[id].J(0, 20) = 1;
         kin_tasks_walk.taskLib[id].J(1, 21) = 1;
@@ -448,9 +450,12 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn)
         taskMap(1, 4) = 1;
         taskMap(2, 5) = 1;
         taskMap(3, 2) = 1;
+        // J_base = [ones(6, 6), zeros(6, 31)]
+        // J选出第3到6个元素
         kin_tasks_walk.taskLib[id].J = taskMap * J_base;
         kin_tasks_walk.taskLib[id].dJ = taskMap * dJ_base;
         kin_tasks_walk.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
+
 
         id = kin_tasks_walk.getId("PxPy");
         kin_tasks_walk.taskLib[id].errX = Eigen::VectorXd::Zero(2);
@@ -463,6 +468,7 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn)
         taskMap = Eigen::MatrixXd::Zero(2, 6);
         taskMap(0, 0) = 1;
         taskMap(1, 1) = 1;
+        // 就是选出dq的前两行 J = [ones(2, 2), zeros(2, 35)]
         kin_tasks_walk.taskLib[id].J = taskMap * J_base;
         kin_tasks_walk.taskLib[id].dJ = taskMap * dJ_base;
         kin_tasks_walk.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
@@ -725,6 +731,9 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn)
         ddq_final_kin = Eigen::VectorXd::Zero(model_nv);
     }
 
+    print_kin_tasks_walk();
+    print_kin_tasks_standce();
+
     // final WBC output collection
 }
 
@@ -745,4 +754,26 @@ void WBC_priority::setQini(const Eigen::VectorXd &qIniDesIn, const Eigen::Vector
 {
     qIniDes = qIniDesIn;
     qIniCur = qIniCurIn;
+}
+
+void WBC_priority::print_kin_tasks_walk() const {
+    std::cout << "walk tasks" << std::endl;
+    for (auto &&task : kin_tasks_walk.taskLib){
+        std::cout << task.taskName << std::endl <<
+        "J:"  << std::endl << task.J << std::endl <<
+        "errX:" << std::endl << task.errX << std::endl <<
+        "dxDes" << std::endl << task.dxDes << std::endl <<
+        "ddxDes" << std::endl << task.ddxDes << std::endl;
+    }
+}
+
+void WBC_priority::print_kin_tasks_standce() const {
+    std::cout << "walk tasks" << std::endl;
+    for (auto &&task : kin_tasks_stand.taskLib){
+        std::cout << task.taskName << std::endl <<
+        "J:"  << std::endl << task.J << std::endl <<
+        "errX:" << std::endl << task.errX << std::endl <<
+        "dxDes" << std::endl << task.dxDes << std::endl <<
+        "ddxDes" << std::endl << task.ddxDes << std::endl;
+    }
 }

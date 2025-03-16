@@ -55,6 +55,7 @@ private:
     std::vector<LPF_Fst> tau_out_lpf;
     std::vector<int> PV_enable;
     double sign(double in);
+    // 左右胳膊个7个，头两个，腰三个，左右腿个6个
     const std::vector<std::string> motorName={"J_arm_l_01","J_arm_l_02","J_arm_l_03", "J_arm_l_04", "J_arm_l_05",
                                               "J_arm_l_06","J_arm_l_07","J_arm_r_01", "J_arm_r_02", "J_arm_r_03",
                                               "J_arm_r_04","J_arm_r_05","J_arm_r_06", "J_arm_r_07",

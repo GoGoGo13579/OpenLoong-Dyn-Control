@@ -108,6 +108,8 @@ struct DataBus
     // cmd values for WBC
     Eigen::Vector3d base_rpy_des;
     Eigen::Vector3d base_pos_des;
+    Eigen::Vector3d base_vel_des;
+    Eigen::Vector3d base_omega_des;
     Eigen::VectorXd des_ddq, des_dq, des_delta_q, des_q;
     Eigen::Vector3d swing_fe_pos_des_W;
     Eigen::Vector3d swing_fe_rpy_des_W;
@@ -186,6 +188,8 @@ struct DataBus
         des_delta_q = Eigen::VectorXd::Zero(model_nv);
         base_rpy_des.setZero();
         base_pos_des.setZero();
+        base_vel_des.setZero();
+        base_omega_des.setZero();
         js_eul_des.setZero();
         js_pos_des.setZero();
         js_omega_des.setZero();

@@ -94,6 +94,9 @@ private:
     qpOASES::real_t qp_lbA[QP_nc_des];
     qpOASES::real_t qp_ubA[QP_nc_des];
     qpOASES::real_t xOpt_iniGuess[QP_nv_des];
+
+    void print_kin_tasks_walk() const;
+    void print_kin_tasks_standce() const;
 };
 
 

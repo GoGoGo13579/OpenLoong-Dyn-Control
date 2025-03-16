@@ -186,6 +186,8 @@ int main(int argc, const char** argv)
             RobotState.des_ddq = Eigen::VectorXd::Zero(mj_model->nv);
             RobotState.des_dq = Eigen::VectorXd::Zero(mj_model->nv);
             RobotState.des_delta_q = Eigen::VectorXd::Zero(mj_model->nv);
+            // 这步重复了RobotState中已经有了RobotState中base_xxx_des和js_xxx_des的功能重复了
+            // 同时这里期望速度还没有赋值？
             RobotState.base_rpy_des << 0, 0, jsInterp.thetaZ;
             RobotState.base_pos_des = RobotState.js_pos_des;
             RobotState.base_pos_des(2) = stand_legLength+foot_height;
@@ -257,24 +259,6 @@ int main(int argc, const char** argv)
                 // pvtCtr.setJointPD(1000,100,"J_knee_r_pitch");
                 // pvtCtr.calMotorsPVT();
 
-                // constexpr double kp = 1.0;
-                // constexpr double kd = 1.0;
-
-                // // pvtCtr.setJointPD(400 * kp, 15 * kd, "J_hip_l_roll");
-                // // pvtCtr.setJointPD(200 * kp, 10 * kd, "J_hip_l_yaw");
-                // // pvtCtr.setJointPD(300 * kp, 10 * kd, "J_hip_l_pitch");
-                // pvtCtr.setJointPD(100,10,"J_ankle_l_pitch");
-                // pvtCtr.setJointPD(100,10,"J_ankle_l_roll");
-                // pvtCtr.setJointPD(1000,100,"J_knee_l_pitch");
-
-                // // pvtCtr.setJointPD(400 * kp, 15 * kd, "J_hip_r_roll");
-                // // pvtCtr.setJointPD(200 * kp, 10 * kd, "J_hip_r_yaw");
-                // // pvtCtr.setJointPD(300 * kp, 10 * kd, "J_hip_r_pitch");
-                // pvtCtr.setJointPD(100,10,"J_ankle_r_pitch");
-                // pvtCtr.setJointPD(100,10,"J_ankle_r_roll");
-                // pvtCtr.setJointPD(1000,100,"J_knee_r_pitch");
-                // pvtCtr.calMotorsPVT();
-
                 double kp = 1.;
                 double kd = 1.;
 
@@ -316,6 +300,8 @@ int main(int argc, const char** argv)
             printf("gps=[%.5f, %.5f, %.5f]\n", RobotState.basePos[0], RobotState.basePos[1], RobotState.basePos[2]);
             printf("vel=[%.5f, %.5f, %.5f]\n", RobotState.baseLinVel[0], RobotState.baseLinVel[1], RobotState.baseLinVel[2]);
             printf("robotstate=%d\n",RobotState.motionState);
+            std::cout << "J_base" << std::endl <<
+            RobotState.J_base << std::endl;
         }
 
         if (mj_data->time>=simEndTime)

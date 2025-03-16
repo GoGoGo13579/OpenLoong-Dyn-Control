@@ -20,10 +20,13 @@ public:
     void setVyDesLPara(double vyDesLIn, double timeToReach);
     void setWzDesLPara(double wzDesLIn, double timeToReach);
     void setIniPos(double posX, double posY, double thetaZ);
+    void setIniPos(
+        const double posX, const double posY, 
+        const double posZ,const double thetaZ);
     void step();
-    double vx_W{0}, vy_W{0}; // generated velocity in x and y direction w.r.t world frame
-    double px_W{0}, py_W{0}; // generated position in x and y direction w.r.t world frame
-    double vx_L{0}, vy_L{0}, wz_L{0}; // generated linear velocity in x and y direction, angular velocity in z direction, w.r.t body frame
+    double vx_W{0.0}, vy_W{0.0}; // generated velocity in x and y direction w.r.t world frame
+    double px_W{0}, py_W{0.0}, pz_W{0.0}; // generated position in x and y direction w.r.t world frame
+    double vx_L{0.0}, vy_L{0}, wz_L{0.0}; // generated linear velocity in x and y direction, angular velocity in z direction, w.r.t body frame
     void dataBusWrite(DataBus &dataBus);
     void reset();
     RampTrajectory vxLGen, vyLGen, wzLGen, thetazGen;

@@ -21,6 +21,7 @@ void JoyStickInterpreter::setWzDesLPara(double wzDesLIn, double timeToReach) {
 }
 
 void JoyStickInterpreter::step() {
+    // Local系下的速度转化为world下的速度
     vx_L=vxLGen.step();
     vy_L=vyLGen.step();
     wz_L=wzLGen.step();

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(openloong-dyn-control)
 
 IF (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release) 
+    set(CMAKE_BUILD_TYPE release) 
 ENDIF ()
 add_compile_options(-std=c++17)
 

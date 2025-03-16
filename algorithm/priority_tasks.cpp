@@ -70,41 +70,97 @@ void PriorityTasks::computeAll(const Eigen::VectorXd &des_delta_q,const Eigen::V
     for (int i=0;i<taskLib.size();i++)
     {
         if (parentId==-1){
-            taskLib[curId].N=Eigen::MatrixXd::Identity(taskLib[curId].J.cols(),taskLib[curId].J.cols());
-            taskLib[curId].Jpre=taskLib[curId].J*taskLib[curId].N;
-            taskLib[curId].delta_q=des_delta_q+ pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W)*taskLib[curId].errX;
-            taskLib[curId].dq=des_dq;
-            Eigen::VectorXd ddxcmd= taskLib[curId].ddxDes + taskLib[curId].kp * taskLib[curId].errX+taskLib[curId].kd*taskLib[curId].derrX;
-            taskLib[curId].ddq= des_ddq + dyn_pseudoInv(taskLib[curId].Jpre,dyn_M_inv,true) * (ddxcmd - taskLib[curId].dJ * dq);
+            // // ----------原始版本--------------
+            // taskLib[curId].N=Eigen::MatrixXd::Identity(taskLib[curId].J.cols(),taskLib[curId].J.cols());
+            // taskLib[curId].Jpre=taskLib[curId].J*taskLib[curId].N;
+            // taskLib[curId].delta_q=des_delta_q+ pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W)*taskLib[curId].errX;
+            // taskLib[curId].dq=des_dq;
+            // Eigen::VectorXd ddxcmd= taskLib[curId].ddxDes + taskLib[curId].kp * taskLib[curId].errX+taskLib[curId].kd*taskLib[curId].derrX;
+            // taskLib[curId].ddq= des_ddq + dyn_pseudoInv(taskLib[curId].Jpre,dyn_M_inv,true) * (ddxcmd - taskLib[curId].dJ * dq);
+            // -----------修改版本-------------
+            // 无论是站立还是行走，最高优先级任务都是接触
+            taskLib[curId].N =
+                Eigen::MatrixXd::Identity(taskLib[curId].J.cols(),
+                                          taskLib[curId].J.cols());
+            taskLib[curId].Jpre = taskLib[curId].J * taskLib[curId].N;
+            taskLib[curId].delta_q =
+                pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W) *
+                taskLib[curId].errX;
+            taskLib[curId].dq =
+                pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W) *
+                taskLib[curId].dxDes;
+            Eigen::VectorXd ddxcmd =
+                taskLib[curId].ddxDes +
+                taskLib[curId].kp * taskLib[curId].errX +
+                taskLib[curId].kd*taskLib[curId].derrX;
+            taskLib[curId].ddq =
+                dyn_pseudoInv(taskLib[curId].Jpre,dyn_M_inv,true) *
+                (ddxcmd - taskLib[curId].dJ * dq);
 //            std::cout<<taskLib[curId].taskName<<std::endl<<taskLib[curId].delta_q.transpose()<<std::endl;
         }
         else{
-            taskLib[curId].N=taskLib[parentId].N*
-                    (Eigen::MatrixXd::Identity(taskLib[parentId].Jpre.cols(),taskLib[parentId].Jpre.cols())- pseudoInv_right_weighted(taskLib[parentId].Jpre,taskLib[parentId].W)*taskLib[parentId].Jpre);
-            taskLib[curId].Jpre=taskLib[curId].J*taskLib[curId].N;
-            taskLib[curId].delta_q=taskLib[parentId].delta_q+ pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W)*(taskLib[curId].errX-
-                    taskLib[curId].J*taskLib[parentId].delta_q);
-            taskLib[curId].dq=taskLib[parentId].dq+ pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W)*(taskLib[curId].dxDes-
-                    taskLib[curId].J*taskLib[parentId].dq);
-            Eigen::VectorXd ddxcmd= taskLib[curId].ddxDes + taskLib[curId].kp * taskLib[curId].errX+taskLib[curId].kd*taskLib[curId].derrX;
-            taskLib[curId].ddq= taskLib[parentId].ddq + dyn_pseudoInv(taskLib[curId].Jpre,dyn_M_inv,true) *
-                                                        (ddxcmd-taskLib[curId].dJ*dq-taskLib[curId].J*taskLib[parentId].ddq);
-//            std::cout<<taskLib[curId].taskName<<std::endl<<taskLib[curId].delta_q.transpose()<<std::endl;
+            // //-------------------原始版本-------------------
+            // taskLib[curId].N=taskLib[parentId].N*
+            //         (Eigen::MatrixXd::Identity(taskLib[parentId].Jpre.cols(),taskLib[parentId].Jpre.cols())- pseudoInv_right_weighted(taskLib[parentId].Jpre,taskLib[parentId].W)*taskLib[parentId].Jpre);
+            // taskLib[curId].Jpre=taskLib[curId].J*taskLib[curId].N;
+            // taskLib[curId].delta_q=taskLib[parentId].delta_q+ pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W)*(taskLib[curId].errX-
+            //         taskLib[curId].J*taskLib[parentId].delta_q);
+            // taskLib[curId].dq=taskLib[parentId].dq+ pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W)*(taskLib[curId].dxDes-
+            //         taskLib[curId].J*taskLib[parentId].dq);
+            // Eigen::VectorXd ddxcmd= taskLib[curId].ddxDes + taskLib[curId].kp * taskLib[curId].errX+taskLib[curId].kd*taskLib[curId].derrX;
+            // taskLib[curId].ddq= taskLib[parentId].ddq + dyn_pseudoInv(taskLib[curId].Jpre,dyn_M_inv,true) *
+            //                                             (ddxcmd-taskLib[curId].dJ*dq-taskLib[curId].J*taskLib[parentId].ddq);
+            //-------------------新版本--------------
+            taskLib[curId].N = taskLib[parentId].N *
+                    (Eigen::MatrixXd::Identity(taskLib[parentId].Jpre.cols(),taskLib
+                        [parentId].Jpre.cols()) -
+                    pseudoInv_right_weighted(taskLib[parentId].Jpre,taskLib[parentId].W) *
+                    taskLib[parentId].Jpre);
+            taskLib[curId].Jpre = taskLib[curId].J * taskLib[curId].N;
+            taskLib[curId].delta_q =
+                taskLib[parentId].delta_q +
+                pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W) *
+                (taskLib[curId].errX -
+                    taskLib[curId].J * taskLib[parentId].delta_q);
+            taskLib[curId].dq =
+                taskLib[parentId].dq +
+                pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W) *
+                (taskLib[curId].dxDes -
+                    taskLib[curId].J * taskLib[parentId].dq);
+            Eigen::VectorXd ddxcmd =
+                taskLib[curId].ddxDes +
+                taskLib[curId].kp * taskLib[curId].errX +
+                taskLib[curId].kd * taskLib[curId].derrX;
+            taskLib[curId].ddq =
+                taskLib[parentId].ddq +
+                dyn_pseudoInv(taskLib[curId].Jpre,dyn_M_inv,true) *
+                    (ddxcmd - taskLib[curId].dJ * dq -
+                    taskLib[curId].J * taskLib[parentId].ddq);
+            // std::cout<<taskLib[curId].taskName << std::endl <<
+            // taskLib[curId].delta_q.transpose()<<std::endl;
         }
 //        printf("task: %s\n", taskLib[curId].taskName.c_str());
 //        Eigen::FullPivLU<Eigen::MatrixXd> lu_decomp(taskLib[curId].Jpre);
 //        printf("taskJacobian rank: %d, rows: %d\n", lu_decomp.rank(), taskLib[curId].Jpre.rows());
-        if (childId!=-1){
+        if (childId!=-1) {
             parentId=curId;
             curId=childId;
             childId=taskLib[curId].childId;
         }
-        else
+        else {
             break;
+        }
     }
-    out_delta_q=taskLib[curId].delta_q;
-    out_dq=taskLib[curId].dq;
-    out_ddq=taskLib[curId].ddq;
+    out_delta_q = taskLib[curId].delta_q;
+    out_dq = taskLib[curId].dq;
+    out_ddq = taskLib[curId].ddq;
+    // out_delta_q = Eigen::VectorXd::Zero(taskLib[curId].delta_q.size());
+    // out_dq = Eigen::VectorXd::Zero(taskLib[curId].delta_q.size());
+    // out_ddq = Eigen::VectorXd::Zero(taskLib[curId].delta_q.size());
+    // std::cout << "*****kinWBC*****" << std::endl <<
+    // out_delta_q.transpose() << std::endl <<
+    // out_dq.transpose() << std::endl <<
+    // out_ddq.transpose() << std::endl;
 }
 
 

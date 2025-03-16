@@ -136,7 +136,7 @@ struct DataBus
     double phi;
     enum MotionState
     {
-        Stand,
+        Stand = 0,
         Walk,
         Walk2Stand
     };

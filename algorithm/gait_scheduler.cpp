@@ -15,18 +15,21 @@ GaitScheduler::GaitScheduler(double tSwingIn, double dtIn)
     dt = dtIn;
     phi = 0;
     isIni = false;
-	firstleg=DataBus::LSt;
-    legState=DataBus::DSt;
-    legStateNext=firstleg;
-    motionState=DataBus::Stand;
-    enableNextStep= false;
+	firstleg = DataBus::LSt;
+    legState = DataBus::DSt;
+    legStateNext = firstleg;
+    motionState = DataBus::Stand;
+    enableNextStep = false;
     touchDown = false;
 }
 
 void GaitScheduler::dataBusRead(const DataBus &robotState)
 {
 	if (motionState != DataBus::Stand && stepNumCur == 0)
+    {
+        // 左脚先为支撑脚
 		legState=firstleg;
+    }
     model_nv = robotState.model_nv;
     torJoint = Eigen::VectorXd::Zero(model_nv - 6);
     for (int i = 0; i < model_nv - 6; i++)
@@ -78,11 +81,17 @@ void GaitScheduler::dataBusWrite(DataBus &robotState)
 
 void GaitScheduler::step()
 {
+    // 设置机器人状态：walk，stand，walk2stand
+    // 设置摆动腿和站立腿相关信息
+    // 估计地面反作用力
     Eigen::VectorXd tauAll;
     tauAll = Eigen::VectorXd::Zero(model_nv);
     tauAll.block(6, 0, model_nv - 6, 1) = torJoint;
-    FLest = -pseudoInv_SVD(J_l * dyn_M.inverse() * J_l.transpose()) * (J_l * dyn_M.inverse() * (tauAll - dyn_Non) + dJ_l * dq);
-    FRest = -pseudoInv_SVD(J_r * dyn_M.inverse() * J_r.transpose()) * (J_r * dyn_M.inverse() * (tauAll - dyn_Non) + dJ_r * dq);
+    // 这个计算适合于左右脚单独支撑的时候
+    FLest = -pseudoInv_SVD(J_l * dyn_M.inverse() * J_l.transpose()) * 
+            (J_l * dyn_M.inverse() * (tauAll - dyn_Non) + dJ_l * dq);
+    FRest = -pseudoInv_SVD(J_r * dyn_M.inverse() * J_r.transpose()) * 
+            (J_r * dyn_M.inverse() * (tauAll - dyn_Non) + dJ_r * dq);
 
     double dPhi{0};
 
@@ -90,10 +99,12 @@ void GaitScheduler::step()
     {
         enableNextStep = false;
 		start_walk = false;
-        if (touchDown)
+        if (touchDown) {
             motionState = DataBus::Stand;
+        }
     }
 
+    // 根据状态这是相位变化
     if (motionState == DataBus::Stand)
     {
         dPhi = 0;
@@ -108,18 +119,22 @@ void GaitScheduler::step()
         dPhi = 1.0 / tSwing * dt;
     }
     else if (motionState == DataBus::Walk2Stand)
+    {
         dPhi = 1.0 / tSwing * dt;
+    }
 
     phi += dPhi;
     if (enableNextStep)
+    {
         touchDown = false;
-
+    }
+    // walk的第一次规划
     if (!isIni &&  start_walk)
     {
         isIni = true;
 		legState = firstleg;
         if (legState == DataBus::LSt)
-        { // here define which leg support first
+        { // here define which leg support first,先迈右脚
             swingStartPos_W = fe_r_pos_W;
             stanceStartPos_W = fe_l_pos_W;
         }

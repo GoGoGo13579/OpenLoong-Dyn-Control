@@ -148,6 +148,7 @@ int main(int argc, const char **argv)
             // s: stop forward walking
             // a: turning left
             // d: turning right
+            // 根据案件确定期望指令
             buttonState = uiController.getButtonState();
             if (simTime > openLoopCtrTime)
             {
@@ -209,7 +210,9 @@ int main(int argc, const char **argv)
             }
 
             if (RobotState.motionState == DataBus::Walk2Stand || simTime <= openLoopCtrTime)
+            {
                 jsInterp.setIniPos(RobotState.q(0), RobotState.q(1), RobotState.base_rpy(2));
+            }
 
             // switch between walk and stand
             if (RobotState.motionState == DataBus::Walk || RobotState.motionState == DataBus::Walk2Stand)
@@ -301,7 +304,16 @@ int main(int argc, const char **argv)
                 RobotState.motors_vel_des = eigen2std(RobotState.wbc_dq_final);
                 RobotState.motors_tor_des = eigen2std(RobotState.wbc_tauJointRes);
             }
-
+            auto cout_vector = [](std::vector<double>& vec)->void {
+                for (auto &&i : vec) {
+                    std::cout << i << " ";
+                }
+                std::cout << std::endl;
+            };
+            std::cout << "motors_des" << std::endl;
+            cout_vector(RobotState.motors_pos_cur);
+            cout_vector(RobotState.motors_vel_cur);
+            cout_vector(RobotState.motors_tor_cur);
             pvtCtr.dataBusRead(RobotState);
             if (simTime <= openLoopCtrTime)
             {
@@ -327,6 +339,15 @@ int main(int argc, const char **argv)
                 pvtCtr.setJointPD(300 * kp, 16 * kd, "J_ankle_r_roll");
 
                 pvtCtr.calMotorsPVT();
+
+                // wbc_walk的PVT参数
+                // pvtCtr.setJointPD(100,10,"J_ankle_l_pitch");
+                // pvtCtr.setJointPD(100,10,"J_ankle_l_roll");
+                // pvtCtr.setJointPD(100,10,"J_ankle_r_pitch");
+                // pvtCtr.setJointPD(100,10,"J_ankle_r_roll");
+                // pvtCtr.setJointPD(1000,100,"J_knee_l_pitch");
+                // pvtCtr.setJointPD(1000,100,"J_knee_r_pitch");
+                // pvtCtr.calMotorsPVT();
             }
             pvtCtr.dataBusWrite(RobotState);
             mj_interface.setMotorsTorque(RobotState.motors_tor_out);
@@ -357,6 +378,7 @@ int main(int argc, const char **argv)
             // printf("gps=[%.5f, %.5f, %.5f]\n", RobotState.basePos[0], RobotState.basePos[1], RobotState.basePos[2]);
             // printf("vel=[%.5f, %.5f, %.5f]\n", RobotState.baseLinVel[0], RobotState.baseLinVel[1], RobotState.baseLinVel[2]);
             // printf("vel=[%.5f, %.5f, %.5f]\n", RobotState.base_vel(0), RobotState.base_vel(1), RobotState.base_vel(2));
+            printf("motionstate=%d\n",RobotState.motionState);
         }
 
         if (mj_data->time >= simEndTime)

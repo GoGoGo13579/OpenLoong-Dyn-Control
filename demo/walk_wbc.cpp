@@ -166,8 +166,8 @@ int main(int argc, const char** argv)
             // 原地踏步 
             if (simTime >= startSteppingTime) {
                 jsInterp.step();
-                RobotState.js_pos_des(2) = stand_legLength + foot_height; // pos z is not assigned in jyInterp
-                jsInterp.dataBusWrite(RobotState); // only pos x, pos y, theta z, vel x, vel y , omega z are rewrote.
+                jsInterp.setIniPos(RobotState.q(0), RobotState.q(1), stand_legLength + foot_height, RobotState.base_rpy(2));
+                jsInterp.dataBusWrite(RobotState); // only pos x, pos y, pos_z, theta z, vel x, vel y , omega z are rewrote.
                 // gait scheduler
                 gaitScheduler.start();
                 RobotState.motionState = DataBus::Walk;
@@ -182,18 +182,11 @@ int main(int argc, const char** argv)
 
             // ------------- WBC ------------
             // WBC input
-            RobotState.Fr_ff = Eigen::VectorXd::Zero(12);
             RobotState.des_ddq = Eigen::VectorXd::Zero(mj_model->nv);
             RobotState.des_dq = Eigen::VectorXd::Zero(mj_model->nv);
             RobotState.des_delta_q = Eigen::VectorXd::Zero(mj_model->nv);
-            // 这步重复了RobotState中已经有了RobotState中base_xxx_des和js_xxx_des的功能重复了
-            // 同时这里期望速度还没有赋值？
-            RobotState.base_rpy_des << 0, 0, jsInterp.thetaZ;
-            RobotState.base_pos_des = RobotState.js_pos_des;
-            RobotState.base_pos_des(2) = stand_legLength+foot_height;
-
-            RobotState.Fr_ff<<0,0,370,0,0,0,
-                    0,0,370,0,0,0;
+            RobotState.Fr_ff << 0,0,370,0,0,0,
+                                0,0,370,0,0,0;
 
             // adjust des_delata_q, des_dq and des_ddq to achieve forward walking
             if (simTime > startWalkingTime + 1) {

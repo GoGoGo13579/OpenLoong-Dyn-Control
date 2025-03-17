@@ -40,9 +40,9 @@ void JoyStickInterpreter::dataBusWrite(DataBus &dataBus) {
     dataBus.js_vel_des[1]=vy_W;
     dataBus.js_eul_des[2]=thetaZ;
     dataBus.js_omega_des[2]=wz_L;
-    dataBus.base_pos_des << px_W, py_W, 0.0;
-    dataBus.base_vel_des << vx_W, vy_W, 0.0;
+    dataBus.base_pos_des << px_W, py_W, pz_W;
     dataBus.base_rpy_des[2] = thetaZ;
+    dataBus.base_vel_des << vx_W, vy_W, vz_W;
     dataBus.base_omega_des[2] = wz_L;
 }
 
@@ -64,11 +64,10 @@ void JoyStickInterpreter::setIniPos(double posX, double posY, double thetaZ) {
 }
 
 void JoyStickInterpreter::setIniPos(
-        const double posX, 
-        const double posY, 
-        const double posZ,
-        const double thetaZ) {
-    // 这里的误差不会累加吗？
+    const double posX, 
+    const double posY, 
+    const double posZ,
+    const double thetaZ) {
     px_W = posX;
     py_W = posY;
     pz_W = posZ;

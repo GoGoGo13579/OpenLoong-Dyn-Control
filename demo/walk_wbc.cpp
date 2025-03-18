@@ -46,7 +46,7 @@ int main(int argc, const char** argv)
     // variables ini
     double stand_legLength = 1.01; // desired baselink height
     double foot_height = 0.07; // distance between the foot ankel joint and the bottom
-    double  xv_des = 2;  // desired velocity in x direction
+    double  xv_des = 0.7;  // desired velocity in x direction
 
     RobotState.width_hips = 0.229;
     footPlacement.kp_vx = 0.03;
@@ -103,7 +103,7 @@ int main(int argc, const char** argv)
     logger.finishItermAdding();
 
     /// ----------------- sim Loop ---------------
-    double simEndTime=15;
+    double simEndTime = 30;
     mjtNum simstart = mj_data->time;
     double simTime = mj_data->time;
     double startSteppingTime = 3;
@@ -160,13 +160,13 @@ int main(int argc, const char** argv)
                 jsInterp.setVxDesLPara(xv_des, 2.0); // jsInterp.setVxDesLPara(0.9,1);
                 RobotState.motionState = DataBus::Walk; // start walking
             } else {
-                jsInterp.setIniPos(RobotState.q(0), RobotState.q(1),
-                                   RobotState.base_rpy(2));
+                // jsInterp.setIniPos(RobotState.q(0), RobotState.q(1),
+                //                    RobotState.base_rpy(2));
+                jsInterp.setIniPos(RobotState.q(0), RobotState.q(1), stand_legLength + foot_height, RobotState.base_rpy(2));
             }
             // 原地踏步 
             if (simTime >= startSteppingTime) {
                 jsInterp.step();
-                jsInterp.setIniPos(RobotState.q(0), RobotState.q(1), stand_legLength + foot_height, RobotState.base_rpy(2));
                 jsInterp.dataBusWrite(RobotState); // only pos x, pos y, pos_z, theta z, vel x, vel y , omega z are rewrote.
                 // gait scheduler
                 gaitScheduler.start();
@@ -232,10 +232,10 @@ int main(int argc, const char** argv)
                 }
                 std::cout << std::endl;
             };
-            std::cout << "motors_des" << std::endl;
-            cout_vector(RobotState.motors_pos_cur);
-            cout_vector(RobotState.motors_vel_cur);
-            cout_vector(RobotState.motors_tor_cur);
+            // std::cout << "motors_des" << std::endl;
+            // cout_vector(RobotState.motors_pos_cur);
+            // cout_vector(RobotState.motors_vel_cur);
+            // cout_vector(RobotState.motors_tor_cur);
 
             pvtCtr.dataBusRead(RobotState);
             if (simTime<=3)
@@ -255,18 +255,32 @@ int main(int argc, const char** argv)
                 double kp = 1.;
                 double kd = 1.;
 
+                // pvtCtr.setJointPD(400 * kp, 15 * kd, "J_hip_l_roll");
+                // pvtCtr.setJointPD(200 * kp, 10 * kd, "J_hip_l_yaw");
+                // pvtCtr.setJointPD(300 * kp, 10 * kd, "J_hip_l_pitch");
+                // pvtCtr.setJointPD(300 * kp, 14 * kd, "J_knee_l_pitch");
+                // pvtCtr.setJointPD(350 * kp, 18 * kd, "J_ankle_l_pitch");
+                // pvtCtr.setJointPD(300 * kp, 16 * kd, "J_ankle_l_roll");
+
+                // pvtCtr.setJointPD(400 * kp, 15 * kd, "J_hip_r_roll");
+                // pvtCtr.setJointPD(200 * kp, 10 * kd, "J_hip_r_yaw");
+                // pvtCtr.setJointPD(300 * kp, 10 * kd, "J_hip_r_pitch");
+                // pvtCtr.setJointPD(350 * kp, 14 * kd, "J_knee_r_pitch");
+                // pvtCtr.setJointPD(300 * kp, 18 * kd, "J_ankle_r_pitch");
+                // pvtCtr.setJointPD(300 * kp, 16 * kd, "J_ankle_r_roll");
+
                 pvtCtr.setJointPD(400 * kp, 15 * kd, "J_hip_l_roll");
                 pvtCtr.setJointPD(200 * kp, 10 * kd, "J_hip_l_yaw");
-                pvtCtr.setJointPD(300 * kp, 10 * kd, "J_hip_l_pitch");
-                pvtCtr.setJointPD(300 * kp, 14 * kd, "J_knee_l_pitch");
-                pvtCtr.setJointPD(300 * kp, 18 * kd, "J_ankle_l_pitch");
+                pvtCtr.setJointPD(350 * kp, 12 * kd, "J_hip_l_pitch");
+                pvtCtr.setJointPD(350 * kp, 16 * kd, "J_knee_l_pitch");
+                pvtCtr.setJointPD(400 * kp, 18 * kd, "J_ankle_l_pitch");
                 pvtCtr.setJointPD(300 * kp, 16 * kd, "J_ankle_l_roll");
 
                 pvtCtr.setJointPD(400 * kp, 15 * kd, "J_hip_r_roll");
                 pvtCtr.setJointPD(200 * kp, 10 * kd, "J_hip_r_yaw");
-                pvtCtr.setJointPD(300 * kp, 10 * kd, "J_hip_r_pitch");
-                pvtCtr.setJointPD(300 * kp, 14 * kd, "J_knee_r_pitch");
-                pvtCtr.setJointPD(300 * kp, 18 * kd, "J_ankle_r_pitch");
+                pvtCtr.setJointPD(350 * kp, 12 * kd, "J_hip_r_pitch");
+                pvtCtr.setJointPD(400 * kp, 16 * kd, "J_knee_r_pitch");
+                pvtCtr.setJointPD(350 * kp, 18 * kd, "J_ankle_r_pitch");
                 pvtCtr.setJointPD(300 * kp, 16 * kd, "J_ankle_r_roll");
 
                 pvtCtr.calMotorsPVT();
@@ -279,7 +293,9 @@ int main(int argc, const char** argv)
             logger.startNewLine();
             logger.recItermData("simTime", simTime);
             logger.recItermData("motors_pos_cur",RobotState.motors_pos_cur);
+            //logger.recItermData("motors_pos_des",RobotState.motors_pos_des);
             logger.recItermData("motors_vel_cur",RobotState.motors_vel_cur);
+            //logger.recItermData("motors_vel_des",RobotState.motors_vel_des);
             logger.recItermData("rpy",RobotState.rpy);
             logger.recItermData("fL",RobotState.fL);
             logger.recItermData("fR",RobotState.fR);
@@ -295,6 +311,10 @@ int main(int argc, const char** argv)
             printf("robotstate=%d\n",RobotState.motionState);
             std::cout << "J_base" << std::endl <<
             RobotState.J_base << std::endl;
+            printf("vel_des=[%.5f, %.5f, %.5f]\n",
+                RobotState.base_vel_des(0), 
+                RobotState.base_vel_des(1), 
+                RobotState.base_vel_des(2));
         }
 
         if (mj_data->time>=simEndTime)

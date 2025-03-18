@@ -57,7 +57,6 @@ void JoyStickInterpreter::reset() {
 }
 
 void JoyStickInterpreter::setIniPos(double posX, double posY, double thetaZ) {
-    // 这里的误差不会累加吗？
     px_W=posX;
     py_W=posY;
     this->thetaZ=thetaZ;

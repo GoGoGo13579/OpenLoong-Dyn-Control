@@ -77,6 +77,8 @@ private:
     Eigen::MatrixXd J_base, dJ_base, Jcom;
     Eigen::MatrixXd J_hip_link;
     Eigen::Vector3d base_pos_des, base_pos, base_rpy_des, base_rpy_cur, hip_link_pos;
+    Eigen::Vector3d base_vel_des, base_omega_des;
+    Eigen::Vector3d base_vel_cur, base_omega_cur;
     Eigen::Matrix3d hip_link_rot, base_rot;
     Eigen::VectorXd swing_fe_pos_des_W, swing_fe_rpy_des_W;
     Eigen::Vector3d stance_fe_pos_cur_W;

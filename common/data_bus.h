@@ -138,7 +138,7 @@ struct DataBus
     double phi;
     enum MotionState
     {
-        Stand = 0,
+        Stand,
         Walk,
         Walk2Stand
     };
@@ -201,6 +201,8 @@ struct DataBus
     // update q according to sensor values, must update sensor values before
     void updateQ()
     {
+        // q中姿态用四元数表示
+        // dq中姿态用角速度表示
         base_omega_W << baseAngVel[0], baseAngVel[1], baseAngVel[2];
         auto Rcur = eul2Rot(rpy[0], rpy[1], rpy[2]);
         base_omega_W = Rcur * base_omega_W;
@@ -216,9 +218,9 @@ struct DataBus
         q(4) = quatNow.y();
         q(5) = quatNow.z();
         q(6) = quatNow.w();
-        for (int i = 0; i < model_nv - 6; i++)
+        for (int i = 0; i < model_nv - 6; i++) {
             q(i + 7) = motors_pos_cur[i];
-
+        }
         Eigen::Vector3d vCoM_W;
         vCoM_W << baseLinVel[0], baseLinVel[1], baseLinVel[2];
         dq.block<3, 1>(0, 0) = vCoM_W;

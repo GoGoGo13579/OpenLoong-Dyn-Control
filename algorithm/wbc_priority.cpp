@@ -49,10 +49,15 @@ WBC_priority::WBC_priority(int model_nv_In, int QP_nvIn, int QP_ncIn, double miu
 
     delta_q_final_kin = Eigen::VectorXd::Zero(model_nv);
     dq_final_kin = Eigen::VectorXd::Zero(model_nv);
-    ;
     ddq_final_kin = Eigen::VectorXd::Zero(model_nv);
 
-    base_rpy_cur = Eigen::VectorXd::Zero(3);
+    base_rpy_cur.setZero();
+    base_pos_des.setZero();
+    base_rpy_des.setZero();
+    base_vel_des.setZero();
+    base_omega_des.setZero();
+    base_vel_cur.setZero();
+    base_omega_cur.setZero();
 
     //  WBC task defined and order build
     ///------------ walk --------------
@@ -103,9 +108,17 @@ void WBC_priority::dataBusRead(const DataBus &robotState)
     fe_R_rot_L_off = robotState.fe_R_rot_L_off;
 
     // deisred values
-    base_rpy_des = robotState.base_rpy_des;
     base_rpy_cur << robotState.rpy[0], robotState.rpy[1], robotState.rpy[2];
+    base_rpy_des = robotState.base_rpy_des;
     base_pos_des = robotState.base_pos_des;
+    base_vel_des = robotState.base_vel_des;
+    base_omega_des = robotState.base_omega_des;
+    base_vel_cur << robotState.baseLinVel[0], 
+                    robotState.baseLinVel[1], 
+                    robotState.baseLinVel[2];
+    base_omega_cur << robotState.baseAngVel[0],
+                      robotState.baseAngVel[1],
+                      robotState.baseAngVel[2];
     swing_fe_pos_des_W = robotState.swing_fe_pos_des_W;
     swing_fe_rpy_des_W = robotState.swing_fe_rpy_des_W;
     stance_fe_pos_cur_W = robotState.stance_fe_pos_cur_W;
@@ -458,12 +471,16 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn)
 
 
         id = kin_tasks_walk.getId("PxPy");
-        kin_tasks_walk.taskLib[id].errX = Eigen::VectorXd::Zero(2);
-        kin_tasks_walk.taskLib[id].errX = des_dq.block(0, 0, 2, 1) * timeStep;
-        kin_tasks_walk.taskLib[id].derrX = Eigen::VectorXd::Zero(2);
+        kin_tasks_walk.taskLib[id].errX.resize(2);
+        kin_tasks_walk.taskLib[id].errX = 
+            base_vel_des.block<2, 1>(0, 0) * timeStep;
+        kin_tasks_walk.taskLib[id].derrX.resize(2);
+        kin_tasks_walk.taskLib[id].derrX = 
+            base_vel_cur.block<2, 1>(0, 0) - base_vel_des.block<2, 1>(0, 0);
+        kin_tasks_walk.taskLib[id].dxDes.resize(2);
+        kin_tasks_walk.taskLib[id].dxDes = base_vel_des.block<2, 1>(0, 0);
         kin_tasks_walk.taskLib[id].ddxDes = Eigen::VectorXd::Zero(2);
-        kin_tasks_walk.taskLib[id].dxDes = Eigen::VectorXd::Zero(2);
-        kin_tasks_walk.taskLib[id].kp = Eigen::MatrixXd::Identity(2, 2) * 100; // 100
+        kin_tasks_walk.taskLib[id].kp = Eigen::MatrixXd::Identity(2, 2) * 1000; // 100
         kin_tasks_walk.taskLib[id].kd = Eigen::MatrixXd::Identity(2, 2) * 50;
         taskMap = Eigen::MatrixXd::Zero(2, 6);
         taskMap(0, 0) = 1;
@@ -483,20 +500,26 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn)
         if (kin_tasks_walk.taskLib[id].errX(2)>0.005){
             kin_tasks_walk.taskLib[id].errX(2) = 0.005;
         }
+        //  求出来是一个so3
         desRot = eul2Rot(base_rpy_des(0), base_rpy_des(1), base_rpy_des(2));
         kin_tasks_walk.taskLib[id].errX.block<3, 1>(3, 0) = diffRot(base_rot, desRot);
         kin_tasks_walk.taskLib[id].errX(4) -= 0.05 * dq(4);
         kin_tasks_walk.taskLib[id].derrX = Eigen::VectorXd::Zero(6);
         // kin_tasks_walk.taskLib[id].derrX = des_dq.block(0, 0, 6, 1) - dq.block(0, 0, 6, 1);
+        // kin_tasks_walk.taskLib[id].derrX << (base_vel_des - base_vel_cur),
+        //                                     (base_omega_des - base_omega_cur);
         kin_tasks_walk.taskLib[id].ddxDes = Eigen::VectorXd::Zero(6);
         kin_tasks_walk.taskLib[id].dxDes = Eigen::VectorXd::Zero(6);
+        // kin_tasks_walk.taskLib[id].dxDes << base_vel_des, base_omega_des;
+        kin_tasks_walk.taskLib[id].dxDes.block(0, 0, 3, 1) = base_vel_des;
         kin_tasks_walk.taskLib[id].kp = Eigen::MatrixXd::Identity(6, 6) * 500;
         kin_tasks_walk.taskLib[id].kp.block(3, 3, 3, 3) = Eigen::MatrixXd::Identity(3, 3) * 500;
-        kin_tasks_walk.taskLib[id].kp(0,0) = 100;
-        kin_tasks_walk.taskLib[id].kp(4,4) = 800;
+        kin_tasks_walk.taskLib[id].kp(0,0) = 800;
+        // kin_tasks_walk.taskLib[id].kp(4,4) = 800;
         // kin_tasks_walk.taskLib[id].kp(3,3) = 800;
         kin_tasks_walk.taskLib[id].kd = Eigen::MatrixXd::Identity(6, 6) * 10;
         kin_tasks_walk.taskLib[id].kd(4,4) = 10;
+        kin_tasks_walk.taskLib[id].kd(0, 0) = 20;
         kin_tasks_walk.taskLib[id].J = J_base;
         kin_tasks_walk.taskLib[id].dJ = dJ_base;
         kin_tasks_walk.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
@@ -731,8 +754,8 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn)
         ddq_final_kin = Eigen::VectorXd::Zero(model_nv);
     }
 
-    print_kin_tasks_walk();
-    print_kin_tasks_standce();
+    // print_kin_tasks_walk();
+    // print_kin_tasks_standce();
 
     // final WBC output collection
 }

@@ -305,16 +305,20 @@ int main(int argc, const char** argv)
             logger.recItermData("baseAngVel",RobotState.baseAngVel);
             logger.finishLine();
 
-            printf("rpyVal=[%.5f, %.5f, %.5f]\n", RobotState.rpy[0], RobotState.rpy[1], RobotState.rpy[2]);
-            printf("gps=[%.5f, %.5f, %.5f]\n", RobotState.basePos[0], RobotState.basePos[1], RobotState.basePos[2]);
-            printf("vel=[%.5f, %.5f, %.5f]\n", RobotState.baseLinVel[0], RobotState.baseLinVel[1], RobotState.baseLinVel[2]);
-            printf("robotstate=%d\n",RobotState.motionState);
-            std::cout << "J_base" << std::endl <<
-            RobotState.J_base << std::endl;
-            printf("vel_des=[%.5f, %.5f, %.5f]\n",
-                RobotState.base_vel_des(0), 
-                RobotState.base_vel_des(1), 
-                RobotState.base_vel_des(2));
+            // printf("rpyVal=[%.5f, %.5f, %.5f]\n", RobotState.rpy[0], RobotState.rpy[1], RobotState.rpy[2]);
+            // printf("gps=[%.5f, %.5f, %.5f]\n", RobotState.basePos[0], RobotState.basePos[1], RobotState.basePos[2]);
+            // printf("vel=[%.5f, %.5f, %.5f]\n", RobotState.baseLinVel[0], RobotState.baseLinVel[1], RobotState.baseLinVel[2]);
+            // printf("robotstate=%d\n",RobotState.motionState);
+            // std::cout << "J_base" << std::endl <<
+            // RobotState.J_base << std::endl;
+            // printf("vel_des=[%.5f, %.5f, %.5f]\n",
+            //     RobotState.base_vel_des(0), 
+            //     RobotState.base_vel_des(1), 
+            //     RobotState.base_vel_des(2));
+            // printf("model_nv=%d\n", RobotState.model_nv);
+            // printf("model_nq=%d\n", RobotState.q.size());
+            printf("fr_l=[%.5f, %.5f, %.5f]\n", 
+                    RobotState.FL_est[0], RobotState.FL_est[1], RobotState.FL_est[2]);
         }
 
         if (mj_data->time>=simEndTime)

@@ -23,6 +23,7 @@ Feel free to use in any purpose, and cite OpenLoong-Dynamics-Control in any styl
 #include <string>
 #include <iostream>
 #include "StateEst.h"
+#include <cstdio>
 
 const double dt = 0.001;
 const double dt_200Hz = 0.005;
@@ -316,6 +317,8 @@ int main(int argc, char **argv)
                 RobotState.motors_vel_des = eigen2std(RobotState.wbc_dq_final);
                 RobotState.motors_tor_des = eigen2std(RobotState.wbc_tauJointRes);
             }
+
+            printf("mpc output fz = %.5f\n", RobotState.Fr_ff[2]);
 
             // joint PVT controller
             pvtCtr.dataBusRead(RobotState);

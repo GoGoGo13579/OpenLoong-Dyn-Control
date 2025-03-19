@@ -12,14 +12,18 @@ Feel free to use in any purpose, and cite OpenLoong-Dynamics-Control in any styl
 #include "data_bus.h"
 #include "qpOASES.hpp"
 
+// 预测时域长度
 const uint16_t  mpc_N = 10;
+// 控制时域长度
 const uint16_t  ch = 3;
+// 状态变量维数
 const uint16_t  nx = 12;
+// 控制变量维数，其中13是由于把g也包含了进来
 const uint16_t  nu = 13;
-
+// 全局系，单个反作用约束维数，摩擦锥约束
 const uint16_t  ncfr_single = 4;
 const uint16_t  ncfr = ncfr_single*2;
-
+// 物体系xy方向力矩约束
 const uint16_t  ncstxya = 1;
 const uint16_t  ncstxy_single = ncstxya*4;
 const uint16_t  ncstxy = ncstxy_single*2;

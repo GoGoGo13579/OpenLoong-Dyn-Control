@@ -228,7 +228,8 @@ Eigen::Matrix<double, 3, 3> Ry3(double theta)
 }
 
 Eigen::Matrix<double, 3, 3> Rz3(double theta)
-{ // local to world
+{ 
+    // local to world
     // for 2D-XY vector, rotation matrix along z axis
     Eigen::Matrix<double, 3, 3> M;
     M << cos(theta), -sin(theta), 0,

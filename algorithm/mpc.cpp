@@ -20,6 +20,7 @@ MPC::MPC(double dtIn) : QP(nu * ch, nc * ch)
 
     max[0] = 1000.0;
     max[1] = 1000.0;
+    // g是负数
     max[2] = -3.0 * m * g;
     max[3] = 20.0;
     max[4] = 80.0;
@@ -93,6 +94,7 @@ void MPC::set_weight(double u_weight, Eigen::MatrixXd L_diag, Eigen::MatrixXd K_
     K = Eigen::MatrixXd::Zero(nu * ch, nu * ch);
 
     alpha = u_weight;
+    // 这步完全多余了，直接用下面那个循环赋值不就完事了
     for (int i = 0; i < mpc_N; i++)
     {
         L_diag_N.block<1, nx>(0, i * nx) = L_diag;
@@ -115,6 +117,9 @@ void MPC::set_weight(double u_weight, Eigen::MatrixXd L_diag, Eigen::MatrixXd K_
 
     for (int i = 0; i < mpc_N; i++)
     {
+        // 为啥要在这里做坐标变换啊？
+        // 直接把x0处理好就完事了，这里每个分开都要做，那不是徒增运算量呢吗？
+        // 不是徒增计算量的事情，这样做本身就是错的吧
         L.block<3, 3>(i * nx + 3, i * nx + 3) = R_curz[i] * L.block<3, 3>(i * nx + 3, i * nx + 3) * R_curz[i].transpose();
         L.block<3, 3>(i * nx + 6, i * nx + 6) = R_curz[i] * L.block<3, 3>(i * nx + 6, i * nx + 6) * R_curz[i].transpose();
         L.block<3, 3>(i * nx + 9, i * nx + 9) = R_curz[i] * L.block<3, 3>(i * nx + 9, i * nx + 9) * R_curz[i].transpose();
@@ -132,6 +137,7 @@ void MPC::set_weight(double u_weight, Eigen::MatrixXd L_diag, Eigen::MatrixXd K_
 void MPC::dataBusRead(DataBus &Data)
 {
     // set value
+    // X = [ψ, p, ω, p_dot]
     X_cur.block<3, 1>(0, 0) = Data.base_rpy;
     X_cur.block<3, 1>(3, 0) = Data.q.block<3, 1>(0, 0);
     X_cur.block<3, 1>(6, 0) = Data.dq.block<3, 1>(3, 0);
@@ -139,8 +145,10 @@ void MPC::dataBusRead(DataBus &Data)
     if (EN)
     {
         // set Xd
+        // Xd前移一个时间步
         for (int i = 0; i < (mpc_N - 1); i++)
             Xd.block<nx, 1>(nx * i, 0) = Xd.block<nx, 1>(nx * (i + 1), 0);
+        // 最后一个时间步的用操纵杆
         for (int j = 0; j < 3; j++)
             Xd(nx * (mpc_N - 1) + j) = Data.js_eul_des(j);
         for (int j = 0; j < 3; j++)
@@ -152,6 +160,7 @@ void MPC::dataBusRead(DataBus &Data)
     }
     else
     {
+        // 不使用期望的话，目标值就是当前值
         for (int i = 0; i < mpc_N; i++)
         {
             for (int j = 0; j < 3; j++)
@@ -174,6 +183,8 @@ void MPC::dataBusRead(DataBus &Data)
     }
 
     R_cur = eul2Rot(X_cur(0), X_cur(1), X_cur(2)); // Data.base_rot;
+    // 既然都一样,就没有必要赋值成对角矩阵了啊
+    // 因为后续计算用的也不是R_curz,而是R_curz[i]
     for (int i = 0; i < mpc_N; i++)
     {
         R_curz[i] = Rz3(X_cur(2));
@@ -220,16 +231,20 @@ void MPC::cal()
     if (EN)
     {
         // qp pre
+        // 完全用不上Ac[i]直接存一个Ac就行了
         for (int i = 0; i < mpc_N; i++)
         {
+            // Ac 连续系统矩阵
             Ac[i].block<3, 3>(0, 6) = R_curz[i].transpose();
             Ac[i].block<3, 3>(3, 9) = Eigen::MatrixXd::Identity(3, 3);
+            // 离散系统矩阵
             A[i] = Eigen::MatrixXd::Identity(nx, nx) + dt * Ac[i];
         }
         for (int i = 0; i < mpc_N; i++)
         {
             pf2comi[i] = pf2com;
             Eigen::Matrix3d Ic_W_inv;
+            // u = [f1, m1, f2, m2, g(1 * 1)];
             Ic_W_inv = (R_curz[i] * Ic * R_curz[i].transpose()).inverse();
             Bc[i].block<3, 3>(6, 0) = Ic_W_inv * CrossProduct_A(pf2comi[i].block<3, 1>(0, 0));
             Bc[i].block<3, 3>(6, 3) = Ic_W_inv;
@@ -240,12 +255,14 @@ void MPC::cal()
             Bc[i]((nx - 1), (nu - 1)) = 1.0 / m;
             B[i] = dt * Bc[i];
         }
+        // X = Aqp*x0 + Bqp * U
+        // 构建Aqp
         for (int i = 0; i < mpc_N; i++)
             Aqp.block<nx, nx>(i * nx, 0) = Eigen::MatrixXd::Identity(nx, nx);
         for (int i = 0; i < mpc_N; i++)
             for (int j = 0; j < i + 1; j++)
                 Aqp.block<nx, nx>(i * nx, 0) = A[j] * Aqp.block<nx, nx>(i * nx, 0);
-
+        // 构建Bqp
         for (int i = 0; i < mpc_N; i++)
             for (int j = 0; j < i + 1; j++)
                 Aqp1.block<nx, nx>(i * nx, j * nx) = Eigen::MatrixXd::Identity(nx, nx);
@@ -282,12 +299,15 @@ void MPC::cal()
         }
 
         H = 2 * (Bqp.transpose() * L * Bqp + alpha * K) + 1e-10 * Eigen::MatrixXd::Identity(nx * mpc_N, nx * mpc_N);
+        // 这里的符号是不是有问题
         c = 2 * Bqp.transpose() * L * (Aqp * X_cur - Xd) + 2 * alpha * K * delta_U;
 
         // friction constraint
-        Eigen::Matrix<double, ncfr_single, 3> Asfr111, Asfr11;
-        Eigen::Matrix<double, ncfr, nu> Asfr1;
-        Eigen::Matrix<double, ncfr * ch, nu * ch> Asfr;
+        // 整一堆中间变量，其实看起来更不清楚了
+        // 最多拿出其中一个小块，然后直接在大矩阵里赋值，更清楚
+        Eigen::Matrix<double, ncfr_single, 3> Asfr111, Asfr11; // 4 * 3
+        Eigen::Matrix<double, ncfr, nu> Asfr1; // 8 * 11
+        Eigen::Matrix<double, ncfr * ch, nu * ch> Asfr; // 24 * 39
         Asfr111.setZero();
         Asfr1.setZero();
         Asfr.setZero();
@@ -335,6 +355,7 @@ void MPC::cal()
 
         for (int i = 0; i < 4; i++)
         {
+            // 这段写的真是太没必要了，干嘛整这么复杂啊
             Astxy_r[i].block<1, 3>(0, 0) =
                 sign_xy[i] * gxyz[i].transpose() * R_w2f * R_f2w * r[i] * (R_f2w * r[i]).transpose() *
                 CrossProduct_A(R_f2w * p[i]);
@@ -386,6 +407,7 @@ void MPC::cal()
         {
             if (legState[i] == DataBus::DSt)
             {
+                // Z轴朝下?
                 Guess_value(i * nu + 2) = -0.5 * m * g;
                 Guess_value(i * nu + 8) = -0.5 * m * g;
                 Guess_value(i * nu + 12) = m * g;
@@ -396,6 +418,7 @@ void MPC::cal()
                     u_up(i * nu + j) = max[j];
                     u_up(i * nu + j + 6) = max[j];
                 }
+                // 一个等式约束
                 u_low(i * nu + 12) = m * g;
                 u_up(i * nu + 12) = m * g;
             }
@@ -431,6 +454,7 @@ void MPC::cal()
                 u_up(i * nu + 12) = m * g;
             }
         }
+        std::cout << "上界: " << u_up << std::endl;
 
         qpOASES::returnValue res;
         nWSR = 1000000;
@@ -451,6 +475,7 @@ void MPC::cal()
             }
             else if (legState[i] == DataBus::LSt)
             {
+                // 左脚着地就只有左脚有约束
                 ubA.block<ncfr_single, 1>(ncfr * i, 0).setZero();
                 ubA.block<ncstxy_single, 1>(ncfr * ch + ncstxy * i, 0).setZero();
                 ubA.block<ncstz_single, 1>(ncfr * ch + ncstxy * ch + ncstz * i, 0).setZero();

@@ -29,6 +29,7 @@ include_directories("algorithm")
 include_directories("common")
 include_directories("math")
 include_directories("sim_interface")
+include_directories("costom_algorithm")
 
 message(${CMAKE_SYSTEM_PROCESSOR})
 if(${CMAKE_CXX_COMPILER} MATCHES "aarch64" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
@@ -41,8 +42,20 @@ endif()
 link_directories(${allLib})
 
 file(GLOB C_SOURCES *.c)
-file(GLOB CPP_SOURCES *.cpp algorithm/*.cpp common/*.cpp math/*.cpp sim_interface/*.cpp)
-file(GLOB HEADER_FILES *.h algorithm/*.h common/*.h math/*.h sim_interface/*.h)
+file(GLOB CPP_SOURCES 
+	*.cpp 
+	algorithm/*.cpp 
+	common/*.cpp 
+	math/*.cpp 
+	sim_interface/*.cpp
+	costom_algorithm/*.cpp)
+file(GLOB HEADER_FILES 
+	*.h 
+	algorithm/*.h 
+	common/*.h 
+	math/*.h 
+	sim_interface/*.h
+	costom_algorithm/*.h)
 set(SOURCES ${C_SOURCES} ${CPP_SOURCES} ${HEADER_FILES})
 
 #链接库

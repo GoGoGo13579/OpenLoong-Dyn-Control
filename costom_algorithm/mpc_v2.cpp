@@ -2,7 +2,7 @@
 #include<Eigen/Dense>
 #include<useful_math.h>
 
-namespace CostomAlgorithm {
+namespace CustomAlgorithm {
 
 using Eigen::MatrixXd;
 using Eigen::Dynamic;
@@ -26,16 +26,18 @@ MPC::MPC(const double dt_input) {
     Bd_.block<3, 3>(9, 0) = Matrix<double, 3, 3>::Identity() * dt_ / m_;
     Bd_.block<3, 3>(9, 9) = Matrix<double, 3, 3>::Identity() * dt_ / m_;
     Gd_.setZero();
-    Gd_(state_dim_ - 1, 0) = -1.0 * dt_;
+    Gd_(state_dim_ - 1, 0) = -1.0 * g_ * dt_;
     // 二次规划相关
     Q_bar_.resize(state_dim_ * prediction_horizon_, 
                 state_dim_ * prediction_horizon_);
+    Q_bar_.setIdentity();
     R_bar_.resize(control_dim_ * control_horizon_, 
                   control_dim_ * control_horizon_);
-    X_ref_.resize(state_dim_ * prediction_horizon_);
-    U_ref_.resize(control_dim_ * control_horizon_);
-    Q_bar_.setIdentity();
     R_bar_.setIdentity();
+    X_ref_.resize(state_dim_ * prediction_horizon_);
+    X_ref_.setZero();
+    U_ref_.resize(control_dim_ * control_horizon_);
+    U_ref_.setZero();
     Fr_ff_.setZero();
     // 力与力矩的上下界
 
@@ -92,7 +94,8 @@ void MPC::dataBusRead(const DataBus &robot_state){
     offset_right_foot_to_com_w_ = 
         robot_state.fe_r_pos_W - x_cur_.block<3, 1>(3, 0);
     // 物体系下绕质心的转动惯量
-    Ic_b_ = robot_state.inertia;
+    // Ic_b_ = robot_state.inertia;
+    Ic_b_  << 12.61, 0, 0.37, 0, 11.15, 0.01, 0.37, 0.01, 2.15;
     // 腿部状态
     DataBus::LegState leg_state_cur = robot_state.legState;
     DataBus::LegState leg_state_next = robot_state.legStateNext;
@@ -122,14 +125,15 @@ void MPC::dataBusRead(const DataBus &robot_state){
 
     Rz_f2w_ = Rz3(x_cur_(2));
     // 输入的期望值
+    U_ref_.setZero();
     for (int i = 0; i < control_horizon_; ++i) {
         if (leg_state_array_[i] == DataBus::LSt) {
             U_ref_[i * control_dim_ + 2] = m_ * g_;
         } else if (leg_state_array_[i] == DataBus::RSt) {
-            U_ref_[i * control_dim_ + 6] = m_ * g_;
+            U_ref_[i * control_dim_ + 8] = m_ * g_;
         } else {
             U_ref_[i * control_dim_ + 2] = m_ * g_ / 2.0;
-            U_ref_[i * control_dim_ + 6] = m_ * g_ / 2.0;
+            U_ref_[i * control_dim_ + 8] = m_ * g_ / 2.0;
         }
     }
 }
@@ -142,20 +146,27 @@ void MPC::set_weight(
     // control_lb_single_leg_ X'*Q_bar*X + control_weight*U'*R_bar*U
     // 状态和输入都应该在物体系下惩罚,状态中的前三个分量为欧拉角,不用做坐标变化
     control_weight_ = control_weight_input;
+    Q_bar_.setIdentity();
     for (int i = 0; i < prediction_horizon_; ++i) {
-        Matrix<double, control_dim_, control_dim_> R_w2b_extended =
-            Matrix<double, control_dim_, control_dim_>::Identity();
+        Matrix<double, state_dim_, state_dim_> R_w2b_extended =
+            Matrix<double, state_dim_, state_dim_>::Identity();
         R_w2b_extended.block<3, 3>(3, 3) = R_w2b_array_[i];
         R_w2b_extended.block<3, 3>(6, 6) = R_w2b_array_[i];
         R_w2b_extended.block<3, 3>(9, 9) = R_w2b_array_[i];
         for (int j = 0; j < state_dim_; ++j) {
             Q_bar_(i * state_dim_ + j, i * state_dim_ + j) = Q_diag(j);
         }
+        // std::cout << "单个---------Q" << std::endl;
+        // std::cout << "--------Q_diag" << std::endl;
+        // std::cout << Q_diag << std::endl;
+        // std::cout << "--------Q" << std::endl;
+        // std::cout << Q_bar_.block<state_dim_, state_dim_>(i * state_dim_, i * state_dim_) << std::endl;
         Q_bar_.block<state_dim_, state_dim_>(i * state_dim_, i * state_dim_) =
             R_w2b_extended.transpose() *
             Q_bar_.block<state_dim_, state_dim_>(i * state_dim_, i * state_dim_) *
             R_w2b_extended;
     }
+    R_bar_.setIdentity();
     for (int i = 0; i < control_horizon_; ++i) {
         Matrix<double, control_dim_, control_dim_> R_w2b_extended =
             Matrix<double, control_dim_, control_dim_>::Zero();
@@ -166,6 +177,7 @@ void MPC::set_weight(
         for (int j = 0; j < control_dim_; ++j) {
             R_bar_(i * control_dim_ + j, i * control_dim_ + j) = R_diag(j);
         }
+        // std::cout << R_bar_.block<control_dim_, control_dim_>(i * control_dim_, i * control_dim_) << std::endl;
         R_bar_.block<control_dim_, control_dim_>(i * control_dim_, i * control_dim_) =
             R_w2b_extended.transpose() * 
             R_bar_.block<control_dim_, control_dim_>(i * control_dim_, i * control_dim_) *
@@ -176,10 +188,13 @@ void MPC::set_weight(
 
 void MPC::cal() {
     if(!enable_) {
+        Fr_ff_.setZero();
+        Fr_ff_(2) = m_ * g_ / 2.0;
+        Fr_ff_(8) = m_ * g_ / 2.0;
         return;
     }
     // 更新状态矩阵与输入矩阵中可变部分
-    Ad_.block<3, 3>(0, 6) = Rz_f2w_ * dt_;
+    Ad_.block<3, 3>(0, 6) = Rz_f2w_.transpose() * dt_;
     // 全局坐标系下绕质心的转动惯量
     Matrix<double, 3, 3> Ic_w_inv = (Rz_f2w_ * Ic_b_ * Rz_f2w_.transpose()).inverse();
     Bd_.block<3, 3>(6, 0) = 
@@ -187,7 +202,7 @@ void MPC::cal() {
     Bd_.block<3, 3>(6, 3) = Ic_w_inv;
     Bd_.block<3, 3>(6, 6) = 
         Ic_w_inv * CrossProduct_A(offset_right_foot_to_com_w_) * dt_;
-
+    Bd_.block<3, 3>(6, 9) = Ic_w_inv;
     // X = Aqp*x0 + Bqp*U + Gqp
     // Aqp. 
     std::array<Matrix<double, state_dim_, state_dim_>, 
@@ -200,18 +215,18 @@ void MPC::cal() {
     Matrix<double, Dynamic, state_dim_> Aqp;
     Aqp.resize(state_dim_ * prediction_horizon_, NoChange);
     for (int i = 0; i < prediction_horizon_; ++i) {
-        Aqp.block<state_dim_, state_dim_>(i * state_dim_, i * state_dim_)  = 
+        Aqp.block<state_dim_, state_dim_>(i * state_dim_, 0)  = 
             Ad_power_array[i];
     }
 
     // Gqp
-    Matrix<double, Dynamic, 1> Gqp;
+    Matrix<double, Dynamic, state_dim_> Gqp;
     Gqp.resize(state_dim_ * prediction_horizon_, NoChange);
     Gqp.block<state_dim_, state_dim_>(0, 0) = 
         Matrix<double, state_dim_, state_dim_>::Identity();
     for (int i = 1; i < prediction_horizon_; ++i) {
-        Gqp.block<state_dim_, state_dim_>(i * state_dim_, i * state_dim_ ) = 
-            Gqp.block<state_dim_, state_dim_>((i - 1) * state_dim_, (i - 1) * state_dim_) +
+        Gqp.block<state_dim_, state_dim_>(i * state_dim_, 0) = 
+            Gqp.block<state_dim_, state_dim_>((i - 1) * state_dim_, 0) +
             Ad_power_array[i - 1];
     }
 
@@ -249,7 +264,7 @@ void MPC::cal() {
     MatrixXd H;
     H = 2 * (Bqp.transpose() * Q_bar_ * Bqp + R_bar_);
     VectorXd g;
-    g = 2 * (Bqp.transpose() * Q_bar_ * (Aqp * x_cur_ + Gqp - X_ref_)) -
+    g = 2 * (Bqp.transpose() * Q_bar_ * (Aqp * x_cur_ + Gqp * Gd_ - X_ref_)) -
         2 * R_bar_ * U_ref_;
 
     // 约束条件
@@ -258,15 +273,16 @@ void MPC::cal() {
     constexpr int nc_single_leg = 10;
     constexpr int control_dim_single_leg =  control_dim_ / 2;
     Matrix<double, nc_single_leg, control_dim_single_leg> A_single_leg_block;
-    // 摩擦锥约束,fz大于放在lb和ub里
+    A_single_leg_block.setZero();
+    // 摩擦锥约束,fz大0于放在lb和ub里,坐标系要求z轴方向与接触面垂直
     A_single_leg_block.block<4, 3>(0, 0) <<  
             -1.0, 0.0, -1.0 / sqrt(2.0) * miu_,
             1.0, 0.0, -1.0 / sqrt(2.0) * miu_,
             0.0, -1.0, -1.0 / sqrt(2.0) * miu_,
             0.0, 1.0, -1.0 / sqrt(2.0) * miu_;
-    // 物体系下z方向力矩约束 |mz| <= factor * μ * fz
+    // 物体系(加上坡度)下z方向力矩约束 |mz| <= factor * μ * fz
     // 旋转矩阵最后统一处理
-    constexpr int factor = 0.6; // 这个系数的计算可以参考笔记
+    constexpr double factor = 0.6; // 这个系数的计算可以参考笔记
     A_single_leg_block.block<1, 6>(4, 0) <<
         0.0, 0.0, -factor * miu_, 0.0, 0.0, 1.0;
     A_single_leg_block.block<1, 6>(5, 0) <<
@@ -279,8 +295,8 @@ void MPC::cal() {
     A_single_leg_block.block<4, 6>(6, 0) <<
         0.0, 0.0, -factor2 * feet_half_x_length, 0.0, 1.0, 0.0,
         0.0, 0.0, -factor2 * feet_half_x_length, 0.0, -1.0, 0.0,
-        0.0, 0.0, -factor2 * feet_half_y_length, 0.0, 1, 0.0,
-        0.0, 0.0, -factor2 * feet_half_x_length, 0.0, -1, 0.0;
+        0.0, 0.0, -factor2 * feet_half_y_length, 1.0, 0.0, 0.0,
+        0.0, 0.0, -factor2 * feet_half_x_length, -1.0, 0.0, 0.0;
 
     // 汇总
     // -∞ <= Ax <= 0
@@ -295,18 +311,22 @@ void MPC::cal() {
     ubA.setConstant(MaxDouble);
     for (int i = 0; i < control_horizon_; ++i) {
         // 控制时域内每一个时间步的左右脚
-        A.block<nc_single_leg, control_dim_single_leg>
-            (2*i * nc_single_leg, i * control_dim_) = A_single_leg_block;
-        A.block<nc_single_leg, control_dim_single_leg>
-            ((2*i + 1) * nc_single_leg, i * control_dim_) = A_single_leg_block;
         // 关于力矩的约束要在物体系下表达，因此部分约束要做坐标变化
         Matrix<double, 6, 6> R_extended_w2b = Matrix<double, 6, 6>::Zero();
         R_extended_w2b.block<3, 3>(0, 0) = R_w2b_array_[i];
         R_extended_w2b.block<3, 3>(3, 3) = R_w2b_array_[i];
-        A.block<6, control_dim_single_leg>(2*i * nc_single_leg + 4, i * control_dim_) *= 
-            R_extended_w2b;
-        A.block<6, control_dim_single_leg>((2*i + 1) * nc_single_leg + 4, i * control_dim_) *=
-            R_extended_w2b;  
+        A.block<nc_single_leg, control_dim_single_leg>
+            (2*i * nc_single_leg, (2*i) * control_dim_single_leg) = 
+        A_single_leg_block * R_extended_w2b;
+        A.block<nc_single_leg, control_dim_single_leg>
+            ((2*i + 1) * nc_single_leg, (2*i + 1) * control_dim_single_leg) =
+        A_single_leg_block * R_extended_w2b;
+        // A.block<6, control_dim_single_leg>
+        //     (2*i * nc_single_leg + 4, (2*i) * control_dim_single_leg) *=
+        // R_extended_w2b;
+        // A.block<6, control_dim_single_leg>
+        //     ((2*i + 1) * nc_single_leg + 4, (2*i + 1) * control_dim_single_leg) *=
+        // R_extended_w2b;  
 
         // 根据legstate设置上界
         if (leg_state_array_[i] == DataBus::LSt) {
@@ -321,17 +341,37 @@ void MPC::cal() {
     // 优化变量上下界
     VectorXd lb, ub;
     lb.resize(control_dim_ * control_horizon_);
+    lb.setZero();
     ub.resize(control_dim_ * control_horizon_);
+    ub.setZero();
     for (int i = 0; i < control_horizon_; ++i) {
-        lb.block<control_dim_, 1>(i * control_dim_, 0) << 
-            control_ub_single_leg_, control_lb_single_leg_;
-        ub.block<control_dim_, 1>(i * control_dim_, 0) <<
+        if (leg_state_array_[i] == DataBus::LSt) {
+            lb.block<control_dim_single_leg, 1>
+                    (2*i * control_dim_single_leg, 0) << 
+            control_lb_single_leg_;
+            ub.block<control_dim_single_leg, 1>
+                    (2*i * control_dim_single_leg, 0) << 
+            control_ub_single_leg_;
+        } else if (leg_state_array_[i] == DataBus::RSt) {
+            lb.block<control_dim_single_leg, 1>
+                ((2*i + 1) * control_dim_single_leg, 0) <<
+            control_lb_single_leg_;
+            ub.block<control_dim_single_leg, 1>
+                ((2*i + 1) * control_dim_single_leg, 0) <<
+            control_ub_single_leg_;
+        } else {
+            lb.block<control_dim_, 1>(i * control_dim_, 0) <<
+            control_lb_single_leg_, control_lb_single_leg_;
+            ub.block<control_dim_, 1>(i * control_dim_, 0) <<
             control_ub_single_leg_, control_ub_single_leg_;
+        }
+
     }
 
     // 猜测初始解
     VectorXd U_opt_ini_guess;
     U_opt_ini_guess.resize(control_dim_ * control_horizon_);
+    U_opt_ini_guess.setZero();
     for (int i = 0; i < control_horizon_; ++i) {
         if (leg_state_array_[i] == DataBus::LSt) {
             U_opt_ini_guess(i * control_dim_ + 2) = m_ * g_;
@@ -342,6 +382,46 @@ void MPC::cal() {
             U_opt_ini_guess(i * control_dim_ + 8) = m_ * g_ / 2.0;
         }
     }
+    // std::cout << std::fixed << std::setprecision(3);
+    // std::cout << "---------------------物体系下质心惯量" << std::endl << Ic_b_ << std::endl;
+    // std::cout << "---------------------Ic_w_inv" << std::endl << Ic_w_inv << std::endl;
+    // std::cout << "---------------------yaw : " << x_cur_[2] << std::endl; 
+    // std::cout << "---------------------旋转矩阵" << std::endl << Rz_f2w_ << std::endl;
+    // std::cout << "---------------------旋转矩阵数组" << std::endl;
+    // for (int i = 0; i < prediction_horizon_; ++i) {
+    //     std::cout << "---------Rw2b第" << i << "个" << std::endl;
+    //     std::cout << (R_w2b_array_[i]) << std::endl;
+    //     std::cout << "---------Rb2w第" << i << "个" << std::endl;
+    //     std::cout << (R_b2w_array_[i]) << std::endl;
+    // }
+    // std::cout << "---------------------离散状态矩阵Ad <<" << std::endl << Ad_ << std::endl;
+    // std::cout << "---------------------离散输入矩阵Bd <<" << std::endl << Bd_ << std::endl;
+    // std::cout << "---------------------离散重力矩阵Gd <<" << std::endl << Gd_ << std::endl;
+    // std::cout << "---------------------期望状态" << std::endl;
+    // std::cout << X_ref_.transpose() << std::endl;
+    // std::cout << "---------------------期望输入" << std::endl;
+    // std::cout << U_ref_.transpose() << std::endl; 
+    // std::cout << "---------------------Aqp" << std::endl << Aqp << std::endl;
+    // std::cout << "---------------------Bqp" << std::endl << Bqp << std::endl;
+    // std::cout << "---------------------Gqp" << std::endl << Gqp << std::endl;
+    // std::cout << std::fixed << std::setprecision(1);
+    // std::cout << "---------------------Q_bar" << std::endl << Q_bar_ << std::endl;
+    // std::cout << std::fixed << std::setprecision(3);
+    // std::cout << "---------------------R_bar" << std::endl << R_bar_ << std::endl;
+    // std::cout << "---------------------H" << std::endl << H << std::endl;
+    // std::cout << "---------------------g" << std::endl << g.transpose() << std::endl;
+    // std::cout << "---------------------A" << std::endl << A << std::endl;
+    // std::cout << "---------------------ubA" << std::endl << ubA.transpose() << std::endl;
+    // std::cout << "---------------------lbA" << std::endl << lbA.transpose() << std::endl;
+    // std::cout << "---------------------ub" << std::endl << ub.transpose() << std::endl;
+    // std::cout << "---------------------lb" << std::endl << lb.transpose() << std::endl;
+    // std::cout << "---------------------U_opt_ini_guess" << std::endl << 
+    //     U_opt_ini_guess.transpose() << std::endl;
+    // std::cout << "---------------------x_cur" << std::endl << x_cur_.transpose() << std::endl;
+    // std::cout << "---------------------offset_left_foot_to_com_w_" <<
+    //     std::endl << offset_left_foot_to_com_w_ << std::endl;
+    // std::cout << "---------------------offset_right_foot_to_com_w_" <<
+    //     std::endl << offset_right_foot_to_com_w_ << std::endl;
 
     // 求解QP
     // 形式转化
@@ -362,7 +442,7 @@ void MPC::cal() {
     copy_Eigen_to_real_t(ub_qpoases, ub);
     copy_Eigen_to_real_t(lb_qpoases, lb);
     copy_Eigen_to_real_t(U_opt_ini_guess_qpoases, U_opt_ini_guess);
-    qp_nWSR_ = 1000;
+    qp_nWSR_ = 1000000;
 
     qpOASES::Options option;
     option.setToMPC();
@@ -374,8 +454,8 @@ void MPC::cal() {
         lb_qpoases, ub_qpoases, lbA_qpoases, 
         ubA_qpoases, qp_nWSR_, &qp_cpu_time_, U_opt_ini_guess_qpoases);
 
-    if (qp_status_ = qpOASES::returnValue::SUCCESSFUL_RETURN) {
-        qpOASES::real_t* U_opt;
+    if (qp_status_ == qpOASES::returnValue::SUCCESSFUL_RETURN) {
+        qpOASES::real_t U_opt[U_opt_ini_guess.size()];
         qp_solver.getPrimalSolution(U_opt);
         for (int i = 0; i < control_dim_; ++i) {
             Fr_ff_(i) = U_opt[i];
@@ -392,6 +472,7 @@ void MPC::cal() {
     delete[] lbA_qpoases;
     delete[] ub_qpoases; 
     delete[] lb_qpoases;
+    delete[] U_opt_ini_guess_qpoases;
 
 }
 
@@ -412,6 +493,9 @@ void MPC::dataBusWrite(DataBus &robot_state) const {
     robot_state.qpStatus_MPC = qp_status_;
     robot_state.qp_cpuTime_MPC = qp_cpu_time_;
     robot_state.qp_nWSR_MPC = qp_nWSR_;
+
+    robot_state.base_rpy_des << 0.005, 0.00, X_ref_(2);
+    robot_state.base_pos_des << X_ref_.block<3, 1>(3, 0);
 }
 
 void MPC::copy_Eigen_to_real_t(
@@ -427,7 +511,7 @@ void MPC::copy_Eigen_to_real_t(
     }
 }
 
-} // end namespace CostomAlgorithm
+} // end namespace CustomAlgorithm
 
 
     

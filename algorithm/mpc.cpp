@@ -237,12 +237,12 @@ void MPC::cal()
             // 离散系统矩阵
             A[i] = Eigen::MatrixXd::Identity(nx, nx) + dt * Ac[i];
         }
+        Eigen::Matrix3d Ic_W_inv;
+        Ic_W_inv = (R_curz[0] * Ic * R_curz[0].transpose()).inverse();
         for (int i = 0; i < mpc_N; i++)
         {
             pf2comi[i] = pf2com;
-            Eigen::Matrix3d Ic_W_inv;
             // u = [f1, m1, f2, m2, g(1 * 1)];
-            Ic_W_inv = (R_curz[i] * Ic * R_curz[i].transpose()).inverse();
             Bc[i].block<3, 3>(6, 0) = Ic_W_inv * CrossProduct_A(pf2comi[i].block<3, 1>(0, 0));
             Bc[i].block<3, 3>(6, 3) = Ic_W_inv;
             Bc[i].block<3, 3>(6, 6) = Ic_W_inv * CrossProduct_A(pf2comi[i].block<3, 1>(3, 0));
@@ -450,7 +450,8 @@ void MPC::cal()
                 u_up(i * nu + 12) = m * g;
             }
         }
-        std::cout << "上界: " << u_up << std::endl;
+        // std::cout << "上界: " << std::endl <<
+        // u_up.transpose() << std::endl;
 
         qpOASES::returnValue res;
         nWSR = 1000000;
@@ -483,6 +484,31 @@ void MPC::cal()
                 ubA.block<ncstz_single, 1>(ncfr * ch + ncstxy * ch + ncstz * i + ncstz_single, 0).setZero();
             }
         }
+        // // std::cout << "物体系下质心惯量" << std::endl << Ic << std::endl;
+        // std::cout << "Ic_w_inv" << std::endl << Ic_W_inv << std::endl;
+        // std::cout << "yaw : " << X_cur(2) << std::endl; 
+        // std::cout << "旋转矩阵" << std::endl << R_curz[0] << std::endl;
+        // std::cout << "离散状态矩阵Ad" << std::endl << A[0] << std::endl;
+        // std::cout << "离散输入矩阵Bd" << std::endl << B[0] << std::endl;
+        // std::cout << "期望状态" << std::endl;
+        // std::cout << Xd.transpose() << std::endl;
+        // std::cout << "期望输入" << std::endl;
+        // std::cout << delta_U.transpose() << std::endl;
+        // std::cout << "---------------------Aqp" << std::endl << Aqp << std::endl;
+        // std::cout << "---------------------Bqp" << std::endl << Bqp << std::endl;
+        // std::cout << std::fixed << std::setprecision(1);
+        // std::cout << "---------------------Q_bar" << std::endl << L << std::endl;
+        // std::cout << std::fixed << std::setprecision(3);
+        // std::cout << "---------------------R_bar" << std::endl << K << std::endl;
+        // std::cout << "---------------------H" << std::endl << H << std::endl;
+        // std::cout << "---------------------g" << std::endl << c.transpose() << std::endl;
+        // std::cout << "---------------------A" << std::endl << As << std::endl;
+        // std::cout << "---------------------ubA" << std::endl << ubA.transpose() << std::endl;
+        // std::cout << "---------------------lbA" << std::endl << lbA.transpose() << std::endl;
+        // std::cout << "---------------------ub" << std::endl << u_up.transpose() << std::endl;
+        // std::cout << "---------------------lb" << std::endl << u_low.transpose() << std::endl;
+        // std::cout << "---------------------U_opt_ini_guess" << std::endl << 
+        // Guess_value.transpose() << std::endl;
 
         copy_Eigen_to_real_t(qp_H, H, nu * ch, nu * ch);
         copy_Eigen_to_real_t(qp_c, c, nu * ch, 1);
@@ -562,8 +588,10 @@ void MPC::dataBusWrite(DataBus &Data)
     Data.des_delta_q.block<2, 1>(0, 0) = Data.des_dq.block<2, 1>(0, 0) * dt;
     Data.des_delta_q(5) = Data.des_dq(5) * dt;
 
+    // 这不循环了吗？
     Data.base_rpy_des << 0.005, 0.00, Xd(2);
     Data.base_pos_des << Xd(3 + 0), Xd(3 + 1), Xd(3 + 2);
+
 }
 
 void MPC::enable()

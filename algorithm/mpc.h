@@ -13,9 +13,9 @@ Feel free to use in any purpose, and cite OpenLoong-Dynamics-Control in any styl
 #include "qpOASES.hpp"
 
 // 预测时域长度
-const uint16_t  mpc_N = 10;
+const uint16_t  mpc_N = 2;
 // 控制时域长度
-const uint16_t  ch = 3;
+const uint16_t  ch = 2;
 // 状态变量维数
 const uint16_t  nx = 12;
 // 控制变量维数，其中13是由于把g也包含了进来

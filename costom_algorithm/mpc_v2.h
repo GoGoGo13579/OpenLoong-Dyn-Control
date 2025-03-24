@@ -5,7 +5,7 @@
 #include<qpOASES.hpp>
 #include<array>
 
-namespace CostomAlgorithm {
+namespace CustomAlgorithm {
 
 using Eigen::Matrix;
 using Eigen::Vector;
@@ -40,9 +40,9 @@ class MPC {
     double dt_;
     // 预测时域长度。在设置矩阵模板参数时需要使用，因此在编译期就要确定其值
     // 所以声明为static，其余声明为static的成员变量同理。
-    static constexpr int prediction_horizon_ = 10;
+    static constexpr int prediction_horizon_ = 2;
     // 控制时域长度
-    static constexpr int control_horizon_ = 3;
+    static constexpr int control_horizon_ = 2;
     // 状态量维度
     static constexpr int state_dim_ = 12;
     // 控制量维度
@@ -89,7 +89,7 @@ class MPC {
     // 转动惯量,物体系下
     Matrix<double, 3, 3> Ic_b_;
     // 腿部状态,其中leg_states
-    std::array<DataBus::LegState, control_horizon_> leg_state_array_;
+    std::array<DataBus::LegState, prediction_horizon_> leg_state_array_;
     // 旋转矩阵.w2f：世界->身体,f2w：身体->世界
     std::array<Matrix<double, 3, 3>, prediction_horizon_> R_w2b_array_, R_b2w_array_;
     Matrix<double, 3, 3> Rz_f2w_;

@@ -24,6 +24,7 @@ Feel free to use in any purpose, and cite OpenLoong-Dynamics-Control in any styl
 #include <iostream>
 #include "StateEst.h"
 #include <cstdio>
+#include <mpc_v2.h>
 
 const double dt = 0.001;
 const double dt_200Hz = 0.005;
@@ -40,7 +41,8 @@ int main(int argc, char **argv)
     Pin_KinDyn kinDynSolver("../models/AzureLoong.urdf");                              // kinematics and dynamics solver
     DataBus RobotState(kinDynSolver.model_nv);                                         // data bus
     WBC_priority WBC_solv(kinDynSolver.model_nv, 18, 22, 0.7, mj_model->opt.timestep); // WBC solver
-    MPC MPC_solv(dt_200Hz);                                                            // mpc controller
+    // MPC MPC_solv(dt_200Hz);                                                           // mpc controller
+    CustomAlgorithm::MPC MPC_solv(dt_200Hz);
     GaitScheduler gaitScheduler(0.4, mj_model->opt.timestep);                          // gait scheduler
     PVT_Ctr pvtCtr(mj_model->opt.timestep, "../common/joint_ctrl_config.json");        // PVT joint control
     FootPlacement footPlacement;                                                       // foot-placement planner
@@ -57,7 +59,7 @@ int main(int argc, char **argv)
     // initialize variables
     double stand_legLength = 1.01; //-0.95; // desired baselink height
     double foot_height = 0.07;     // distance between the foot ankel joint and the bottom
-    double xv_des = 0.8;           // desired velocity in x direction
+    double xv_des = 0.7;           // desired velocity in x direction
 
     const int robot_nq = kinDynSolver.model_nv + 1;
     const int robot_nv = robot_nq - 1;
@@ -127,7 +129,7 @@ int main(int argc, char **argv)
 
     int MPC_count = 0; // count for controlling the mpc running period
 
-    double openLoopCtrTime = 3;
+    double openLoopCtrTime = 1.5;
     double startSteppingTime = 7;
     double startWalkingTime = 10;
     double simEndTime = 200;
@@ -224,8 +226,8 @@ int main(int argc, char **argv)
             // switch between walk and stand
             if (RobotState.motionState == DataBus::Walk || RobotState.motionState == DataBus::Walk2Stand)
             {
-                jsInterp.step();
                 RobotState.js_pos_des(2) = stand_legLength + foot_height; // pos z is not assigned in jyInterp
+                jsInterp.step();
                 jsInterp.dataBusWrite(RobotState);                        // only pos x, pos y, theta z, vel x, vel y , omega z are rewrote.
 
                 MPC_solv.enable();
@@ -317,8 +319,14 @@ int main(int argc, char **argv)
                 RobotState.motors_vel_des = eigen2std(RobotState.wbc_dq_final);
                 RobotState.motors_tor_des = eigen2std(RobotState.wbc_tauJointRes);
             }
-
-            printf("mpc output fz = %.5f\n", RobotState.Fr_ff[2]);
+            std::cout << "------------------" 
+            << simTime <<"-------------------" << std::endl;
+            std::cout << "MPC足端反作用力" << std::endl;
+            std::cout << RobotState.Fr_ff.transpose() << std::endl;
+            std::cout << "base_rpy_des = " << 
+            RobotState.base_rpy_des.transpose() << std::endl;
+            std::cout << "base_pos_des = " <<
+            RobotState.base_pos_des.transpose() << std::endl;
 
             // joint PVT controller
             pvtCtr.dataBusRead(RobotState);

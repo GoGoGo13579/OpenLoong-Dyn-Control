@@ -1,0 +1,6 @@
+Sat Mar 22 11:07:02 2025
+WARNING: mju_openResource: unknown file '../models/scene.xml'
+
+Sat Mar 22 11:31:39 2025
+WARNING: mju_openResource: unknown file '../models/scene.xml'
+

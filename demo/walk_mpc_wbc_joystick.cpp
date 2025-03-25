@@ -25,6 +25,7 @@ Feel free to use in any purpose, and cite OpenLoong-Dynamics-Control in any styl
 #include "StateEst.h"
 #include <cstdio>
 #include <mpc_v2.h>
+#include <wbc_v2.h>
 
 const double dt = 0.001;
 const double dt_200Hz = 0.005;
@@ -40,7 +41,9 @@ int main(int argc, char **argv)
     MJ_Interface mj_interface(mj_model, mj_data);                                      // data interface for Mujoco
     Pin_KinDyn kinDynSolver("../models/AzureLoong.urdf");                              // kinematics and dynamics solver
     DataBus RobotState(kinDynSolver.model_nv);                                         // data bus
-    WBC_priority WBC_solv(kinDynSolver.model_nv, 18, 22, 0.7, mj_model->opt.timestep); // WBC solver
+    // WBC_priority WBC_solv(kinDynSolver.model_nv, 18, 22, 0.7, mj_model->opt.timestep); // WBC solver
+    CustomAlgorithm::WBC_priority 
+        WBC_solv(mj_model->opt.timestep, RobotState.model_nv);
     // MPC MPC_solv(dt_200Hz);                                                           // mpc controller
     CustomAlgorithm::MPC MPC_solv(dt_200Hz);
     GaitScheduler gaitScheduler(0.4, mj_model->opt.timestep);                          // gait scheduler
@@ -98,7 +101,7 @@ int main(int argc, char **argv)
     qIniDes.block(7, 0, mj_model->nq - 7, 1) = resLeg.jointPosRes;
     qIniDes.block(7, 0, 7, 1) = hd_l_des;
     qIniDes.block(14, 0, 7, 1) = hd_r_des;
-    WBC_solv.setQini(qIniDes, RobotState.q);
+    // WBC_solv.setQini(qIniDes, RobotState.q);
 
     // register variable name for data logger
     logger.addIterm("dyn_time", 1);
@@ -247,12 +250,12 @@ int main(int argc, char **argv)
 
             if (simTime <= openLoopCtrTime || RobotState.motionState == DataBus::Walk2Stand)
             {
-                WBC_solv.setQini(qIniDes, RobotState.q);
-                WBC_solv.fe_l_pos_des_W = RobotState.fe_l_pos_W;
-                WBC_solv.fe_r_pos_des_W = RobotState.fe_r_pos_W;
-                WBC_solv.fe_l_rot_des_W = RobotState.fe_l_rot_W;
-                WBC_solv.fe_r_rot_des_W = RobotState.fe_r_rot_W;
-                WBC_solv.pCoMDes = RobotState.pCoM_W;
+                // WBC_solv.setQini(qIniDes, RobotState.q);
+                // WBC_solv.fe_l_pos_des_W = RobotState.fe_l_pos_W;
+                // WBC_solv.fe_r_pos_des_W = RobotState.fe_r_pos_W;
+                // WBC_solv.fe_l_rot_des_W = RobotState.fe_l_rot_W;
+                // WBC_solv.fe_r_rot_des_W = RobotState.fe_r_rot_W;
+                // WBC_solv.pCoMDes = RobotState.pCoM_W;
             }
 
 			// ------------- MPC ------------
@@ -284,6 +287,7 @@ int main(int argc, char **argv)
 
             // ------------- WBC ------------
             // WBC Calculation
+            // WBC_solv.dataBusRead(RobotState);
             WBC_solv.dataBusRead(RobotState);
             WBC_solv.computeDdq(kinDynSolver);
             WBC_solv.computeTau();

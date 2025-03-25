@@ -201,11 +201,12 @@ void WBC_priority::dataBusWrite(DataBus &robotState)
 
     robotState.wbc_delta_q_final = delta_q_final_kin;
     robotState.wbc_dq_final = dq_final_kin;
-    robotState.wbc_ddq_final = ddq_final_kin;
+    // 这个ddqfinal不把前边的给覆盖了嘛
+    // robotState.wbc_ddq_final = ddq_final_kin;
 
-    robotState.qp_status = qpStatus;
-    robotState.qp_nWSR = nWSR;
-    robotState.qp_cpuTime = cpu_time;
+    // robotState.qp_status = qpStatus;
+    // robotState.qp_nWSR = nWSR;
+    // robotState.qp_cpuTime = cpu_time;
 }
 
 // QP problem contains joint torque, QP_nv=6+12, QP_nc=22;

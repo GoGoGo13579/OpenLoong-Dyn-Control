@@ -294,9 +294,9 @@ void MPC::cal()
                 delta_U(nu * i + 8) = 0.5 * m * g;
             }
         }
-
+        // 这里的维度应该是不匹配的
+        // H是26 * 26的, Identity 是 120 * 120的
         H = 2 * (Bqp.transpose() * L * Bqp + alpha * K) + 1e-10 * Eigen::MatrixXd::Identity(nx * mpc_N, nx * mpc_N);
-        // 这里的符号是不是有问题
         c = 2 * Bqp.transpose() * L * (Aqp * X_cur - Xd) + 2 * alpha * K * delta_U;
 
         // friction constraint

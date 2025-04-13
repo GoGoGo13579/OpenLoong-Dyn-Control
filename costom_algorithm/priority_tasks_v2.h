@@ -7,7 +7,7 @@
 #include <iostream>
 
 
-namespace CustomAlgorithm {
+namespace CostomAlgorithm {
     
 struct Task{
     std::string taskName;
@@ -39,4 +39,4 @@ public:
     void printTaskInfo();
 };
 
-} // end namespace CustomAlgorithm
+} // end namespace CostomAlgorithm

@@ -6,11 +6,11 @@
 #include "priority_tasks_v2.h"
 #include "qpOASES.hpp"
 
-namespace CustomAlgorithm {
+namespace CostomAlgorithm {
 
 enum class WBCMode {
-    mode1 = 0, //接触作为最高优先级任务
-    mode2 = 1  //接触不作为最高优先级任务，由二次规划保证接触
+    HardContactMode = 0, //接触作为最高优先级任务
+    SoftContactMode = 1  //接触不作为最高优先级任务，由二次规划保证接触
 }; 
 
 class WBC_priority {
@@ -31,7 +31,8 @@ class WBC_priority {
     // 动力学WBC计算
     void computeTau();
  private:
-    WBCMode mode_ = WBCMode::mode1;
+    int model_nv_ = 0;
+    WBCMode mode_ = WBCMode::HardContactMode;
     double timestep_ = 0.001;
     double miu_ = 0.5;
     // 数据结构体指针
@@ -41,8 +42,8 @@ class WBC_priority {
     // 运动学WBC计算结果
     Eigen::MatrixXd delta_q_final_kin_, dq_final_kin_, ddq_final_kin_;
     // 反作用力上下界
-    double f_z_low_ = 10.0;
-    double f_z_upp_ = 1400.0;
+    double fr_z_min_ = 10.0;
+    double fr_z_max_ = 1400.0;
     // 力矩上下界
     Eigen::Vector3d tau_upp_stand_L_, tau_low_stand_L_, 
                     tau_upp_walk_L_, tau_low_walk_L_;
@@ -57,7 +58,13 @@ class WBC_priority {
     // 动力学WBC计算结果
     Eigen::VectorXd optimal_var_, optimal_var_pre_,
                     ddp_final_dyn_, Fr_final_dyn_, 
-                    tau_final_dyn_; 
+                    tau_final_dyn_;
+    // 按照硬接触来计算tau
+    void computeTauHardContact();
+    // 按照软接触来计算tau
+    void computeTauSoftContact();
+    Eigen::MatrixXd J_contact_pre_;
+    bool is_first_run_ = true;
 };
 
-} // end namespace CustomAlgorithm
+} // end namespace CostomAlgorithm

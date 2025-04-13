@@ -1,6 +1,7 @@
 #include"priority_tasks_v2.h"
+#include"costom_utils.hpp"
 
-namespace CustomAlgorithm {
+namespace CostomAlgorithm {
 
 void PriorityTasks::addTask(const char* name) {
     taskLib.emplace_back(name);
@@ -83,9 +84,27 @@ void PriorityTasks::computeAll(
                 taskLib[curId].kd*taskLib[curId].derrX;
             taskLib[curId].ddq =
                 dyn_pseudoInv(taskLib[curId].Jpre,dyn_M_inv,true) *
-                (ddxcmd - taskLib[curId].dJ * dq);
-            // std::cout<<taskLib[curId].taskName<<
-            // std::endl<<taskLib[curId].delta_q.transpose()<<std::endl;
+                (ddxcmd - taskLib[curId].dJ * taskLib[curId].dq);
+            std::cout << std::endl << "=============PriorityTask===========" <<
+                std::endl;
+            CostomUtils::print_vector(taskLib[curId].delta_q, 
+                taskLib[curId].taskName + ": delta_q");
+            CostomUtils::print_vector(taskLib[curId].dq,
+                taskLib[curId].taskName + ": dq");
+            CostomUtils::print_vector(taskLib[curId].ddq,
+                taskLib[curId].taskName + ": ddq");
+            CostomUtils::print_vector(ddxcmd,
+                taskLib[curId].taskName + ": ddxcmd");
+            CostomUtils::print_vector(dq,
+                taskLib[curId].taskName + ": 当前机器人实际dq");
+            CostomUtils::print_matrix(taskLib[curId].kp, 
+                taskLib[curId].taskName + ": kd");
+            CostomUtils::print_vector(taskLib[curId].errX, 
+                taskLib[curId].taskName + ": errX");
+            CostomUtils::print_vector(taskLib[curId].kp * taskLib[curId].errX, 
+                    taskLib[curId].taskName + ": kd * errX");
+            std::cout << 
+                std::endl << "=============END PriorityTask===========" << std::endl;
         } else {
             taskLib[curId].N = taskLib[parentId].N *
                     (Eigen::MatrixXd::Identity(taskLib[parentId].Jpre.cols(),taskLib
@@ -112,12 +131,8 @@ void PriorityTasks::computeAll(
                 dyn_pseudoInv(taskLib[curId].Jpre,dyn_M_inv,true) *
                     (ddxcmd - taskLib[curId].dJ * dq -
                     taskLib[curId].J * taskLib[parentId].ddq);
-            // std::cout<<taskLib[curId].taskName << std::endl <<
-            // taskLib[curId].delta_q.transpose()<<std::endl;
         }
-//        printf("task: %s\n", taskLib[curId].taskName.c_str());
-//        Eigen::FullPivLU<Eigen::MatrixXd> lu_decomp(taskLib[curId].Jpre);
-//        printf("taskJacobian rank: %d, rows: %d\n", lu_decomp.rank(), taskLib[curId].Jpre.rows());
+
         if (childId!=-1) {
             parentId=curId;
             curId=childId;

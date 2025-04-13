@@ -13,7 +13,7 @@ Feel free to use in any purpose, and cite OpenLoong-Dynamics-Control in any styl
 #include "qpOASES.hpp"
 
 // 预测时域长度
-const uint16_t  mpc_N = 2;
+const uint16_t  mpc_N = 10;
 // 控制时域长度
 const uint16_t  ch = 2;
 // 状态变量维数

@@ -2,7 +2,7 @@
 #include<Eigen/Dense>
 #include<useful_math.h>
 
-namespace CustomAlgorithm {
+namespace CostomAlgorithm {
 
 using Eigen::MatrixXd;
 using Eigen::Dynamic;
@@ -67,22 +67,12 @@ void MPC::dataBusRead(const DataBus &robot_state){
     // 目标状态设置
     if (enable_) {
         // 将Xd_所有时间步前移一位
-        for (int i = 0; i < prediction_horizon_ - 1; ++i) {
-            X_ref_.block<state_dim_, 1>(i + state_dim_, 0) = 
-            X_ref_.block<state_dim_, 1>((i + 1) * state_dim_, 0);
-        }
+        X_ref_.block<state_dim_ * (prediction_horizon_ - 1), 1>(0, 0) =
+            X_ref_.block<state_dim_ * (prediction_horizon_ - 1), 1>(state_dim_, 0);
         // 将Xd_最后一个时间步赋值为joystick期望值
-        for (int i = 0; i < 3; ++i) {
-            X_ref_((prediction_horizon_ - 1) * state_dim_ + i) = 
-                robot_state.js_eul_des(i);
-            X_ref_((prediction_horizon_ - 1) * state_dim_ + i + 3) = 
-                robot_state.js_pos_des(i);
-            X_ref_((prediction_horizon_ - 1) * state_dim_ + i + 6) = 
-                robot_state.js_omega_des(i);
-            X_ref_((prediction_horizon_ - 1) * state_dim_ + i + 9) = 
-                robot_state.js_vel_des(i);
-        }
-
+        X_ref_.block<state_dim_, 1>(state_dim_ * (prediction_horizon_ - 1), 0) <<
+            robot_state.js_eul_des, robot_state.js_pos_des, 
+            robot_state.js_omega_des, robot_state.js_vel_des;
     } else {
         for (int i = 0; i < prediction_horizon_; ++i) {
             X_ref_.block<state_dim_, 1>(i * state_dim_, 0) = x_cur_;
@@ -296,7 +286,7 @@ void MPC::cal() {
         0.0, 0.0, -factor2 * feet_half_x_length, 0.0, 1.0, 0.0,
         0.0, 0.0, -factor2 * feet_half_x_length, 0.0, -1.0, 0.0,
         0.0, 0.0, -factor2 * feet_half_y_length, 1.0, 0.0, 0.0,
-        0.0, 0.0, -factor2 * feet_half_x_length, -1.0, 0.0, 0.0;
+        0.0, 0.0, -factor2 * feet_half_y_length, -1.0, 0.0, 0.0;
 
     // 汇总
     // -∞ <= Ax <= 0
@@ -511,7 +501,7 @@ void MPC::copy_Eigen_to_real_t(
     }
 }
 
-} // end namespace CustomAlgorithm
+} // end namespace CostomAlgorithm
 
 
     

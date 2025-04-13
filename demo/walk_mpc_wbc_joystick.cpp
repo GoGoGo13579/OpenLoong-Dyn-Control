@@ -42,10 +42,11 @@ int main(int argc, char **argv)
     Pin_KinDyn kinDynSolver("../models/AzureLoong.urdf");                              // kinematics and dynamics solver
     DataBus RobotState(kinDynSolver.model_nv);                                         // data bus
     // WBC_priority WBC_solv(kinDynSolver.model_nv, 18, 22, 0.7, mj_model->opt.timestep); // WBC solver
-    CustomAlgorithm::WBC_priority 
+    CostomAlgorithm::WBC_priority 
         WBC_solv(mj_model->opt.timestep, RobotState.model_nv);
+    WBC_solv.setMode(CostomAlgorithm::WBCMode::SoftContactMode);
     // MPC MPC_solv(dt_200Hz);                                                           // mpc controller
-    CustomAlgorithm::MPC MPC_solv(dt_200Hz);
+    CostomAlgorithm::MPC MPC_solv(dt_200Hz);
     GaitScheduler gaitScheduler(0.4, mj_model->opt.timestep);                          // gait scheduler
     PVT_Ctr pvtCtr(mj_model->opt.timestep, "../common/joint_ctrl_config.json");        // PVT joint control
     FootPlacement footPlacement;                                                       // foot-placement planner
@@ -325,12 +326,14 @@ int main(int argc, char **argv)
             }
             std::cout << "------------------" 
             << simTime <<"-------------------" << std::endl;
-            std::cout << "MPC足端反作用力" << std::endl;
-            std::cout << RobotState.Fr_ff.transpose() << std::endl;
+            std::cout << "MPC足端翻作用力" << std::endl <<
+                RobotState.Fr_ff.transpose() << std::endl;
+            std::cout << "最终足端反作用力" << std::endl << 
+                RobotState.wbc_FrRes.transpose() << std::endl;
             std::cout << "base_rpy_des = " << 
-            RobotState.base_rpy_des.transpose() << std::endl;
+                RobotState.base_rpy_des.transpose() << std::endl;
             std::cout << "base_pos_des = " <<
-            RobotState.base_pos_des.transpose() << std::endl;
+                RobotState.base_pos_des.transpose() << std::endl;
 
             // joint PVT controller
             pvtCtr.dataBusRead(RobotState);

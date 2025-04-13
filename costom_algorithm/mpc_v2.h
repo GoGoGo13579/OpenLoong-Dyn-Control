@@ -5,7 +5,7 @@
 #include<qpOASES.hpp>
 #include<array>
 
-namespace CustomAlgorithm {
+namespace CostomAlgorithm {
 
 using Eigen::Matrix;
 using Eigen::Vector;

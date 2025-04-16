@@ -1,6 +1,7 @@
-#include"wbc_v2.h"
-#include<qpOASES.hpp>
-#include"costom_utils.hpp"
+#include <qpOASES.hpp>
+#include "wbc_v2.h"
+#include "costom_utils.hpp"
+#include "useful_math.h"
 
 namespace CostomAlgorithm {
 
@@ -39,6 +40,9 @@ void WBC_priority::setMode(const WBCMode& mode_input) {
     initTasks(model_nv_);   
 }
 
+WBCMode WBC_priority::getMode() const {
+    return mode_;
+}
 void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn) {
 
     const int model_nv = robot_state_ptr_->model_nv;
@@ -129,12 +133,26 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn) {
         kin_tasks_walk_.taskLib[id].errX.block(0, 0, 3, 1) = 
             robot_state_ptr_->base_pos_des - 
             robot_state_ptr_->q.block(0, 0, 3, 1);
-        if (fabs(kin_tasks_walk_.taskLib[id].errX(0)) >= 0.02)
-            kin_tasks_walk_.taskLib[id].errX(0) = 0.02 * sign(kin_tasks_walk_.taskLib[id].errX(0));
-        if (fabs(kin_tasks_walk_.taskLib[id].errX(1)) >= 0.02)
-            kin_tasks_walk_.taskLib[id].errX(1) = 0.02 * sign(kin_tasks_walk_.taskLib[id].errX(1));
-        if (kin_tasks_walk_.taskLib[id].errX(2)>0.005){
-            kin_tasks_walk_.taskLib[id].errX(2) = 0.005;
+        double pos_x_error_threshold;
+        double pos_y_error_threshold;
+        double pos_z_error_threshold;
+        if (mode_ == WBCMode::HardContactMode) {
+            pos_x_error_threshold = 0.02;
+            pos_y_error_threshold = 0.02;
+            pos_z_error_threshold = 0.005;
+        } else if (mode_ == WBCMode::SoftContactMode) {
+            pos_x_error_threshold = 0.03;
+            pos_y_error_threshold = 0.03;
+            pos_z_error_threshold = 0.01;
+        }
+        if (fabs(kin_tasks_walk_.taskLib[id].errX(0)) >= pos_x_error_threshold)
+            kin_tasks_walk_.taskLib[id].errX(0) = 
+                pos_x_error_threshold * sign(kin_tasks_walk_.taskLib[id].errX(0));
+        if (fabs(kin_tasks_walk_.taskLib[id].errX(1)) >= pos_y_error_threshold)
+            kin_tasks_walk_.taskLib[id].errX(1) = 
+                pos_y_error_threshold * sign(kin_tasks_walk_.taskLib[id].errX(1));
+        if (kin_tasks_walk_.taskLib[id].errX(2) > pos_z_error_threshold){
+            kin_tasks_walk_.taskLib[id].errX(2) = pos_z_error_threshold;
         }
         //  求出来是一个so3
         desRot = eul2Rot(robot_state_ptr_->base_rpy_des(0), 
@@ -150,20 +168,42 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn) {
             robot_state_ptr_->base_omega_des, robot_state_ptr_->base_vel_des ;
         kin_tasks_walk_.taskLib[id].J = robot_state_ptr_->J_base;
         kin_tasks_walk_.taskLib[id].dJ = robot_state_ptr_->dJ_base;
+        if (mode_ == WBCMode::SoftContactMode) {
+            kin_tasks_walk_.taskLib[id].N = 
+                Eigen::MatrixXd::Identity(J_contact.cols(), J_contact.cols()) -
+                pseudoInv_right_weighted(J_contact, kin_tasks_walk_.taskLib[id].W) *
+                    J_contact;
+        }
 
         id = kin_tasks_walk_.getId("SwingLeg");
-        kin_tasks_walk_.taskLib[id].errX = Eigen::VectorXd::Zero(6);
-        kin_tasks_walk_.taskLib[id].errX.block<3, 1>(0, 0) = 
-            robot_state_ptr_->swing_fe_pos_des_W - fe_pos_sw_W;
-        desRot = eul2Rot(
-            robot_state_ptr_->swing_fe_rpy_des_W(0),
-            robot_state_ptr_->swing_fe_rpy_des_W(1),
-            robot_state_ptr_->swing_fe_rpy_des_W(2));
-        kin_tasks_walk_.taskLib[id].errX.block<3, 1>(3, 0) = diffRot(fe_rot_sw_W, desRot);      
-        kin_tasks_walk_.taskLib[id].errX(4) *= 2;
-        kin_tasks_walk_.taskLib[id].derrX = Eigen::VectorXd::Zero(6);
-        kin_tasks_walk_.taskLib[id].ddxDes = Eigen::VectorXd::Zero(6);
-        kin_tasks_walk_.taskLib[id].dxDes = Eigen::VectorXd::Zero(6);
+        if (mode_ == WBCMode::HardContactMode) {
+            kin_tasks_walk_.taskLib[id].errX = Eigen::VectorXd::Zero(6);
+            kin_tasks_walk_.taskLib[id].errX.block<3, 1>(0, 0) = 
+                robot_state_ptr_->swing_fe_pos_des_W - fe_pos_sw_W;
+            desRot = eul2Rot(
+                robot_state_ptr_->swing_fe_rpy_des_W(0),
+                robot_state_ptr_->swing_fe_rpy_des_W(1),
+                robot_state_ptr_->swing_fe_rpy_des_W(2));
+            kin_tasks_walk_.taskLib[id].errX.block<3, 1>(3, 0) = diffRot(fe_rot_sw_W, desRot);      
+            kin_tasks_walk_.taskLib[id].errX(4) *= 2;
+            kin_tasks_walk_.taskLib[id].derrX = Eigen::VectorXd::Zero(6);
+            kin_tasks_walk_.taskLib[id].ddxDes = Eigen::VectorXd::Zero(6);
+            kin_tasks_walk_.taskLib[id].dxDes = Eigen::VectorXd::Zero(6);
+        } else if (mode_ == WBCMode::SoftContactMode) {
+            kin_tasks_walk_.taskLib[id].errX = Eigen::VectorXd::Zero(6);
+            kin_tasks_walk_.taskLib[id].errX.block<3, 1>(0, 0) = 
+                robot_state_ptr_->swing_fe_pos_des_W - fe_pos_sw_W;
+            desRot = eul2Rot(
+                robot_state_ptr_->swing_fe_rpy_des_W(0),
+                robot_state_ptr_->swing_fe_rpy_des_W(1),
+                robot_state_ptr_->swing_fe_rpy_des_W(2));
+            kin_tasks_walk_.taskLib[id].errX.block<3, 1>(3, 0) = diffRot(fe_rot_sw_W, desRot);      
+            kin_tasks_walk_.taskLib[id].errX(4) *= 2;
+            kin_tasks_walk_.taskLib[id].errX *= 1.5;
+            kin_tasks_walk_.taskLib[id].derrX = Eigen::VectorXd::Zero(6);
+            kin_tasks_walk_.taskLib[id].ddxDes = Eigen::VectorXd::Zero(6);
+            kin_tasks_walk_.taskLib[id].dxDes = Eigen::VectorXd::Zero(6);
+        }
         kin_tasks_walk_.taskLib[id].J = J_swing;
         kin_tasks_walk_.taskLib[id].J.block(0, 22, 6, 3).setZero(); // exculde waist joints
         kin_tasks_walk_.taskLib[id].dJ = dJ_swing;
@@ -264,11 +304,11 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn) {
             taskMapRPY * robot_state_ptr_->J_hip_link;
         kin_tasks_stand_.taskLib[id].J.block(2, 22, 3, 3).setZero(); // exculde waist joints
         kin_tasks_stand_.taskLib[id].J.block(2, 6, 3, 14).setZero(); // exculde arm joints
-        std::cout << std::endl << "==========CoMXY_HipRPY==========" << std::endl;
-        CostomUtils::print_vector(kin_tasks_stand_.taskLib[id].errX, 
-                                  "CoMXY_HipRPY: errX");
-        CostomUtils::print_vector(kin_tasks_stand_.taskLib[id].derrX, 
-                                    "CoMXY_HipRPY: errX");
+        // std::cout << std::endl << "==========CoMXY_HipRPY==========" << std::endl;
+        // CostomUtils::print_vector(kin_tasks_stand_.taskLib[id].errX, 
+        //                           "CoMXY_HipRPY: errX");
+        // CostomUtils::print_vector(kin_tasks_stand_.taskLib[id].derrX, 
+        //                             "CoMXY_HipRPY: errX");
 
         // define swing arm motion
         Eigen::VectorXd target_arm_q;
@@ -341,7 +381,8 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn) {
 
 void WBC_priority::computeTau() {
     if (mode_ == WBCMode::HardContactMode) {
-        computeTauHardContact();
+        // computeTauHardContact();
+        computeTauSoftContact();
     } else if (mode_ == WBCMode::SoftContactMode) {
         computeTauSoftContact();
     }
@@ -544,13 +585,16 @@ void WBC_priority::computeTauSoftContact() {
     // MPC输出的反作用力松弛(12维), 接触点质心加速度(12维), ddq的松弛(维度可变)
     // ddq可以自己定义修改,只要修改var_ddq_dim的数值和选择矩阵S_ddq
     // 暂定为质心6 + 双腿12 = 18 
-    const int var_delta_ddq_dim = robot_state_ptr_->model_nv;
+    // const int var_delta_ddq_dim = robot_state_ptr_->model_nv;
+    const int var_delta_ddq_dim = 18;
     const int var_all_dim = 12 + 12 + var_delta_ddq_dim;
     Eigen::MatrixXd selector_ddq_mat;
-    selector_ddq_mat.setIdentity(robot_state_ptr_->model_nv, var_delta_ddq_dim);
-    // selector_ddq_mat.setZero(robot_state_ptr_->model_nv, var_delta_ddq_dim);
-    // selector_ddq_mat.topLeftCorner(6, 6).setIdentity();
-    // selector_ddq_mat.bottomRightCorner(12, 12).setIdentity();
+    // selector_ddq_mat.setIdentity(robot_state_ptr_->model_nv, var_delta_ddq_dim);
+    selector_ddq_mat.setZero(robot_state_ptr_->model_nv, var_delta_ddq_dim);
+    selector_ddq_mat.topLeftCorner(6, 6).setIdentity();
+    selector_ddq_mat.bottomRightCorner(12, 12).setIdentity();
+
+
     // 等式约束
     // 浮动基动力学约束
     Eigen::MatrixXd selector_float_mat, J_contact;
@@ -645,10 +689,10 @@ void WBC_priority::computeTauSoftContact() {
         fr_z_left_min = fr_z_min_;
         fr_z_left_max = fr_z_max_;
         fr_z_right_min = fr_z_min_;
-        fr_z_right_max = 50.0;
+        fr_z_right_max = 20.0;
     } else if (robot_state_ptr_->legState == DataBus::RSt) {
         fr_z_left_min = fr_z_min_;
-        fr_z_left_max = 50.0;
+        fr_z_left_max = 20.0;
         fr_z_right_min = fr_z_min_;
         fr_z_right_max = fr_z_max_;
     } else if (robot_state_ptr_->legState == DataBus::DSt) {
@@ -675,22 +719,26 @@ void WBC_priority::computeTauSoftContact() {
     // 目标函数
     Eigen::MatrixXd H_delta_fr, H_ddxc, H_delta_ddq;
     H_delta_fr.setIdentity(12, 12);
-    H_delta_fr.diagonal() <<
-        1.0, 1.0, 2, 3.0, 3.0, 3.0,
-        1.0, 1.0, 2, 3.0, 3.0, 3.0;
-    H_delta_fr.diagonal() *= 100.0;    
-    H_ddxc = Eigen::MatrixXd::Identity(12, 12) * 500.0;
+    // H_delta_fr.diagonal() <<
+    //     10.0, 1.0, 2, 3.0, 3.0, 3.0,
+    //     10.0, 1.0, 2, 3.0, 3.0, 3.0;
+    H_delta_fr.diagonal() *= 50.0;    
+    H_ddxc = Eigen::MatrixXd::Identity(12, 12) * 20.0;
+    H_ddxc.diagonal().head(3).setConstant(40.0);
+    H_ddxc.diagonal().segment(6, 3).setConstant(40.0);
     H_delta_ddq = 
         Eigen::MatrixXd::Identity(var_delta_ddq_dim ,var_delta_ddq_dim) * 1e6;
+    H_delta_ddq.diagonal().segment(var_delta_ddq_dim - 6, 3).setConstant(1e10);
+    H_delta_ddq.diagonal().segment(var_delta_ddq_dim - 12, 3).setConstant(1e10);
     // H_delta_ddq.topLeftCorner(6, 6).diagonal().setConstant(1e8);
     // 根据站立状态设计权重值
     if (robot_state_ptr_->legState == DataBus::LSt) {
         // 左脚站立：左脚的反作用力的惩罚很小，左脚接触点加速度惩罚很大
         H_delta_fr.diagonal().head(6).setConstant(10.0);
-        H_ddxc.diagonal().tail(6).setConstant(20.0);
+        H_ddxc.diagonal().tail(6).setConstant(10.0);
     } else if (robot_state_ptr_->legState == DataBus::RSt) {
         H_delta_fr.diagonal().tail(6).setConstant(10.0);
-        H_ddxc.diagonal().head(6).setConstant(20.0);
+        H_ddxc.diagonal().head(6).setConstant(10.0);
     }
     // 拼成一个大矩阵
     Eigen::MatrixXd H_total;
@@ -790,26 +838,26 @@ void WBC_priority::computeTauSoftContact() {
     // std::cout << std::endl << "----- Intermediate Variables -----" << std::endl;
     // CostomUtils::print_matrix(J_contact, "J_contact");
     // CostomUtils::print_matrix(dJ_contact, "dJ_contact");
-    CostomUtils::print_vector(ddq_final_kin_, "ddq_final_kin_");
-    CostomUtils::print_vector(dq_final_kin_, "dq_final_kin_");
-    CostomUtils::print_vector(J_contact * ddq_final_kin_, "J_contact * ddq_final_kin_");
-    CostomUtils::print_vector(dJ_contact * dq_final_kin_, "dJ_contact * dq_final_kin_");
-    std::cout << "Current leg state: " << 
-        static_cast<int>(robot_state_ptr_->legState) << 
-        " (0=LSt,1=RSt,2=DSt)" << std::endl;
+    // CostomUtils::print_vector(ddq_final_kin_, "ddq_final_kin_");
+    // CostomUtils::print_vector(dq_final_kin_, "dq_final_kin_");
+    // CostomUtils::print_vector(J_contact * ddq_final_kin_, "J_contact * ddq_final_kin_");
+    // CostomUtils::print_vector(dJ_contact * dq_final_kin_, "dJ_contact * dq_final_kin_");
+    // std::cout << "Current leg state: " << 
+    //     static_cast<int>(robot_state_ptr_->legState) << 
+    //     " (0=LSt,1=RSt,2=DSt)" << std::endl;
 
-    // 打印优化结果
-    std::cout << std::endl << "----- Optimization Results -----" << std::endl;
-    CostomUtils::print_vector(optimal_var_.head(12), "地面反作用力松弛");
-    CostomUtils::print_vector(optimal_var_.segment(12, 12), "接触加速度");
-    CostomUtils::print_vector(optimal_var_.tail(18), "质心与关节加速度松弛");
-    CostomUtils::print_vector(tau_final_dyn_.head(6), "Tau result (first 6)");
-    CostomUtils::print_vector(Fr_final_dyn_.head(6), "Fr_final_dyn_ (left)");
-    CostomUtils::print_vector(Fr_final_dyn_.tail(6), "Fr_final_dyn_ (right)");
+    // // 打印优化结果
+    // std::cout << std::endl << "----- Optimization Results -----" << std::endl;
+    // CostomUtils::print_vector(optimal_var_.head(12), "地面反作用力松弛");
+    // CostomUtils::print_vector(optimal_var_.segment(12, 12), "接触加速度");
+    // CostomUtils::print_vector(optimal_var_.tail(18), "质心与关节加速度松弛");
+    // CostomUtils::print_vector(tau_final_dyn_.head(6), "Tau result (first 6)");
+    // CostomUtils::print_vector(Fr_final_dyn_.head(6), "Fr_final_dyn_ (left)");
+    // CostomUtils::print_vector(Fr_final_dyn_.tail(6), "Fr_final_dyn_ (right)");
 
 
-    std::cout << std::endl << "================= DEBUG INFO END =================" 
-    << std::endl << std::endl;
+    // std::cout << std::endl << "================= DEBUG INFO END =================" 
+    // << std::endl << std::endl;
 
     delete[] H_qpoases;
     delete[] A_qpoases;
@@ -916,7 +964,6 @@ void WBC_priority::initTasks(const int model_nv){
         kin_tasks_walk_.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
 
         id = kin_tasks_walk_.getId("PosRot");
-
         if (mode_ == WBCMode::HardContactMode) {
             kin_tasks_walk_.taskLib[id].kp = Eigen::MatrixXd::Identity(6, 6) * 500;
             kin_tasks_walk_.taskLib[id].kp.block(3, 3, 3, 3) = Eigen::MatrixXd::Identity(3, 3) * 500;
@@ -927,14 +974,19 @@ void WBC_priority::initTasks(const int model_nv){
             kin_tasks_walk_.taskLib[id].kd(4,4) = 10;
             kin_tasks_walk_.taskLib[id].kd(0, 0) = 20;
         } else if (mode_ == WBCMode::SoftContactMode) {
-            kin_tasks_walk_.taskLib[id].kp = Eigen::MatrixXd::Identity(6, 6) * 20.0;
-            kin_tasks_walk_.taskLib[id].kd = Eigen::MatrixXd::Identity(6, 6) * 3.0;
+            kin_tasks_walk_.taskLib[id].kp = Eigen::MatrixXd::Identity(6, 6) * 25.0;
+            kin_tasks_walk_.taskLib[id].kd = Eigen::MatrixXd::Identity(6, 6) * 15.0;
         } 
         kin_tasks_walk_.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
 
         id = kin_tasks_walk_.getId("SwingLeg");
-        kin_tasks_walk_.taskLib[id].kp = Eigen::MatrixXd::Identity(6, 6) * 500;
-        kin_tasks_walk_.taskLib[id].kd = Eigen::MatrixXd::Identity(6, 6) * 20;
+        if (mode_ == WBCMode::HardContactMode) {
+            kin_tasks_walk_.taskLib[id].kp = Eigen::MatrixXd::Identity(6, 6) * 500;
+            kin_tasks_walk_.taskLib[id].kd = Eigen::MatrixXd::Identity(6, 6) * 20;
+        } else if (mode_ == WBCMode::SoftContactMode) {
+            kin_tasks_walk_.taskLib[id].kp = Eigen::MatrixXd::Identity(6, 6) * 100;
+            kin_tasks_walk_.taskLib[id].kd = Eigen::MatrixXd::Identity(6, 6) * 10;
+        } 
         kin_tasks_walk_.taskLib[id].W.diagonal() = Eigen::VectorXd::Ones(model_nv);
 
         id = kin_tasks_walk_.getId("HandTrackJoints");

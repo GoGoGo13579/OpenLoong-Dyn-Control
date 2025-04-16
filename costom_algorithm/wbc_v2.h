@@ -26,6 +26,7 @@ class WBC_priority {
     // 模式1：最高优先级任务为接触
     // 模式2：接触任务被置于二次规划中解决
     void setMode(const WBCMode& mode_input);
+    WBCMode getMode() const;
     // 运动学WBC计算deltaq，dq，ddq指令
     void computeDdq(Pin_KinDyn &pinKinDynIn);
     // 动力学WBC计算
@@ -42,8 +43,8 @@ class WBC_priority {
     // 运动学WBC计算结果
     Eigen::MatrixXd delta_q_final_kin_, dq_final_kin_, ddq_final_kin_;
     // 反作用力上下界
-    double fr_z_min_ = 10.0;
-    double fr_z_max_ = 1400.0;
+    double fr_z_min_ = 0.0;
+    double fr_z_max_ = 2000.0;
     // 力矩上下界
     Eigen::Vector3d tau_upp_stand_L_, tau_low_stand_L_, 
                     tau_upp_walk_L_, tau_low_walk_L_;

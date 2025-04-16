@@ -51,11 +51,11 @@ void PriorityTasks::buildPriority(const std::vector<std::string> &taskOrder) {
 }
 
 void PriorityTasks::printTaskInfo() {
-    for (int i=0;i<taskLib.size();i++)
+    for (int i=0; i<taskLib.size(); i++)
     {
         printf("-------------\n");
-        printf("taskName=%s\n",taskLib[i].taskName.c_str());
-        printf("parentId=%d, childId=%d\n",taskLib[i].parentId,taskLib[i].childId);
+        printf("taskName=%s\n", taskLib[i].taskName.c_str());
+        printf("parentId=%d, childId=%d\n", taskLib[i].parentId, taskLib[i].childId);
     }
 }
 
@@ -85,26 +85,26 @@ void PriorityTasks::computeAll(
             taskLib[curId].ddq =
                 dyn_pseudoInv(taskLib[curId].Jpre,dyn_M_inv,true) *
                 (ddxcmd - taskLib[curId].dJ * taskLib[curId].dq);
-            std::cout << std::endl << "=============PriorityTask===========" <<
-                std::endl;
-            CostomUtils::print_vector(taskLib[curId].delta_q, 
-                taskLib[curId].taskName + ": delta_q");
-            CostomUtils::print_vector(taskLib[curId].dq,
-                taskLib[curId].taskName + ": dq");
-            CostomUtils::print_vector(taskLib[curId].ddq,
-                taskLib[curId].taskName + ": ddq");
-            CostomUtils::print_vector(ddxcmd,
-                taskLib[curId].taskName + ": ddxcmd");
-            CostomUtils::print_vector(dq,
-                taskLib[curId].taskName + ": 当前机器人实际dq");
-            CostomUtils::print_matrix(taskLib[curId].kp, 
-                taskLib[curId].taskName + ": kd");
-            CostomUtils::print_vector(taskLib[curId].errX, 
-                taskLib[curId].taskName + ": errX");
-            CostomUtils::print_vector(taskLib[curId].kp * taskLib[curId].errX, 
-                    taskLib[curId].taskName + ": kd * errX");
-            std::cout << 
-                std::endl << "=============END PriorityTask===========" << std::endl;
+            // std::cout << std::endl << "=============PriorityTask===========" <<
+            //     std::endl;
+            // CostomUtils::print_vector(taskLib[curId].delta_q, 
+            //     taskLib[curId].taskName + ": delta_q");
+            // CostomUtils::print_vector(taskLib[curId].dq,
+            //     taskLib[curId].taskName + ": dq");
+            // CostomUtils::print_vector(taskLib[curId].ddq,
+            //     taskLib[curId].taskName + ": ddq");
+            // CostomUtils::print_vector(ddxcmd,
+            //     taskLib[curId].taskName + ": ddxcmd");
+            // CostomUtils::print_vector(dq,
+            //     taskLib[curId].taskName + ": 当前机器人实际dq");
+            // CostomUtils::print_matrix(taskLib[curId].kp, 
+            //     taskLib[curId].taskName + ": kd");
+            // CostomUtils::print_vector(taskLib[curId].errX, 
+            //     taskLib[curId].taskName + ": errX");
+            // CostomUtils::print_vector(taskLib[curId].kp * taskLib[curId].errX, 
+            //         taskLib[curId].taskName + ": kd * errX");
+            // std::cout << 
+            //     std::endl << "=============END PriorityTask===========" << std::endl;
         } else {
             taskLib[curId].N = taskLib[parentId].N *
                     (Eigen::MatrixXd::Identity(taskLib[parentId].Jpre.cols(),taskLib

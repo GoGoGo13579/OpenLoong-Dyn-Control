@@ -128,22 +128,21 @@ Eigen::Quaterniond eul2quat(double roll, double pitch, double yaw)
     return resQuat;
 }
 
-Eigen::Matrix<double, 3, 1> diffRot(const Eigen::Matrix3d &Rcur, Eigen::Matrix3d &Rdes)
-{
+Eigen::Matrix<double, 3, 1> diffRot(const Eigen::Matrix3d &Rcur, Eigen::Matrix3d &Rdes) {
+    // 输入：Rcur与Rdes处于同一坐标系中，当前的旋转矩阵与期望的旋转矩阵
+    // 输出：与Rcur同一坐标系中的角速度w
     Eigen::Matrix3d R = Rcur.transpose() * Rdes;
     Eigen::Vector3d w;
 
-    if (R.isDiagonal(1e-5) && fabs(R(0, 0)) + fabs(R(1, 1)) + fabs(R(2, 2)) - 3 < 1e-3)
-    {
+    if (R.isDiagonal(1e-5) && 
+        fabs(R(0, 0)) + fabs(R(1, 1)) + fabs(R(2, 2)) - 3 < 1e-3) {
         w.setZero();
     }
-    else if (R.isDiagonal(1e-5))
-    {
+    else if (R.isDiagonal(1e-5)) {
         w << R(0, 0) + 1, R(1, 1) + 1, R(2, 2) + 1;
         w = w * 3.1415 / 2.0;
     }
-    else
-    {
+    else {
         Eigen::Vector3d l;
         l << R(2, 1) - R(1, 2), R(0, 2) - R(2, 0), R(1, 0) - R(0, 1);
         double sita = atan2(l.norm(), R(0, 0) + R(1, 1) + R(2, 2) - 1);

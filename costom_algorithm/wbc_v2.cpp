@@ -37,6 +37,7 @@ void WBC_priority::dataBusRead(const DataBus *robotState_ptr) {
 
 void WBC_priority::setMode(const WBCMode& mode_input) {
     mode_ = mode_input;
+    // mode_ = WBCMode::HardContactMode;
     initTasks(model_nv_);   
 }
 
@@ -197,7 +198,8 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn) {
                 robot_state_ptr_->swing_fe_rpy_des_W(0),
                 robot_state_ptr_->swing_fe_rpy_des_W(1),
                 robot_state_ptr_->swing_fe_rpy_des_W(2));
-            kin_tasks_walk_.taskLib[id].errX.block<3, 1>(3, 0) = diffRot(fe_rot_sw_W, desRot);      
+            kin_tasks_walk_.taskLib[id].errX.block<3, 1>(3, 0) = 
+                diffRot(fe_rot_sw_W, desRot);      
             kin_tasks_walk_.taskLib[id].errX(4) *= 2;
             kin_tasks_walk_.taskLib[id].errX *= 1.5;
             kin_tasks_walk_.taskLib[id].derrX = Eigen::VectorXd::Zero(6);
@@ -304,11 +306,20 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn) {
             taskMapRPY * robot_state_ptr_->J_hip_link;
         kin_tasks_stand_.taskLib[id].J.block(2, 22, 3, 3).setZero(); // exculde waist joints
         kin_tasks_stand_.taskLib[id].J.block(2, 6, 3, 14).setZero(); // exculde arm joints
+        // if (mode_ == WBCMode::SoftContactMode) {
+        //     kin_tasks_stand_.taskLib[id].N = 
+        //         Eigen::MatrixXd::Identity(J_contact.cols(), J_contact.cols()) -
+        //         pseudoInv_right_weighted(J_contact, kin_tasks_stand_.taskLib[id].W) *
+        //             J_contact;
+        //     CostomUtils::print_matrix(kin_tasks_stand_.taskLib[id].N, "CoMXY_HipRPY: N");
+        //     CostomUtils::print_matrix(kin_tasks_stand_.taskLib[id].J, "CoMXY_HipRPY: J");
+        // }
         // std::cout << std::endl << "==========CoMXY_HipRPY==========" << std::endl;
         // CostomUtils::print_vector(kin_tasks_stand_.taskLib[id].errX, 
         //                           "CoMXY_HipRPY: errX");
         // CostomUtils::print_vector(kin_tasks_stand_.taskLib[id].derrX, 
         //                             "CoMXY_HipRPY: errX");
+        // CostomUtils::print_matrix(J_contact, "Joncact");
 
         // define swing arm motion
         Eigen::VectorXd target_arm_q;
@@ -381,8 +392,8 @@ void WBC_priority::computeDdq(Pin_KinDyn &pinKinDynIn) {
 
 void WBC_priority::computeTau() {
     if (mode_ == WBCMode::HardContactMode) {
-        // computeTauHardContact();
-        computeTauSoftContact();
+        computeTauHardContact();
+        // computeTauSoftContact();
     } else if (mode_ == WBCMode::SoftContactMode) {
         computeTauSoftContact();
     }
@@ -619,8 +630,11 @@ void WBC_priority::computeTauSoftContact() {
         J_contact_pre_ = J_contact;
         is_first_run_ = false;
     } 
-    Eigen::MatrixXd dJ_contact = (J_contact - J_contact_pre_) / timestep_;
-    J_contact_pre_ = J_contact;
+    // Eigen::MatrixXd dJ_contact = (J_contact - J_contact_pre_) / timestep_;
+    // J_contact_pre_ = J_contact;
+    Eigen::MatrixXd dJ_contact = 
+        Eigen::MatrixXd::Zero(J_contact.rows(), J_contact.cols());
+
 
     Eigen::MatrixXd A2(12, var_all_dim);
     A2 << Eigen::Matrix<double, 12, 12>::Zero(),
@@ -723,22 +737,22 @@ void WBC_priority::computeTauSoftContact() {
     //     10.0, 1.0, 2, 3.0, 3.0, 3.0,
     //     10.0, 1.0, 2, 3.0, 3.0, 3.0;
     H_delta_fr.diagonal() *= 50.0;    
-    H_ddxc = Eigen::MatrixXd::Identity(12, 12) * 20.0;
-    H_ddxc.diagonal().head(3).setConstant(40.0);
-    H_ddxc.diagonal().segment(6, 3).setConstant(40.0);
+    H_ddxc = Eigen::MatrixXd::Identity(12, 12) * 10.0;
+    // H_ddxc.diagonal().head(3).setConstant(40.0);
+    // H_ddxc.diagonal().segment(6, 3).setConstant(40.0);
     H_delta_ddq = 
-        Eigen::MatrixXd::Identity(var_delta_ddq_dim ,var_delta_ddq_dim) * 1e6;
-    H_delta_ddq.diagonal().segment(var_delta_ddq_dim - 6, 3).setConstant(1e10);
-    H_delta_ddq.diagonal().segment(var_delta_ddq_dim - 12, 3).setConstant(1e10);
+        Eigen::MatrixXd::Identity(var_delta_ddq_dim ,var_delta_ddq_dim) * 1e7;
+    // H_delta_ddq.diagonal().segment(var_delta_ddq_dim - 6, 3).setConstant(1e10);
+    // H_delta_ddq.diagonal().segment(var_delta_ddq_dim - 12, 3).setConstant(1e10);
     // H_delta_ddq.topLeftCorner(6, 6).diagonal().setConstant(1e8);
     // 根据站立状态设计权重值
     if (robot_state_ptr_->legState == DataBus::LSt) {
         // 左脚站立：左脚的反作用力的惩罚很小，左脚接触点加速度惩罚很大
         H_delta_fr.diagonal().head(6).setConstant(10.0);
-        H_ddxc.diagonal().tail(6).setConstant(10.0);
+        H_ddxc.diagonal().tail(6).setConstant(1.0);
     } else if (robot_state_ptr_->legState == DataBus::RSt) {
         H_delta_fr.diagonal().tail(6).setConstant(10.0);
-        H_ddxc.diagonal().head(6).setConstant(10.0);
+        H_ddxc.diagonal().head(6).setConstant(1.0);
     }
     // 拼成一个大矩阵
     Eigen::MatrixXd H_total;

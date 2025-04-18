@@ -68,9 +68,14 @@ void PriorityTasks::computeAll(
     for (int i=0; i<taskLib.size(); i++)
     {
         if (parentId==-1) {
-            taskLib[curId].N =
+            if (taskLib[curId].N.rows() == 0 || taskLib[curId].N.cols() == 0) {
+                taskLib[curId].N =
                 Eigen::MatrixXd::Identity(taskLib[curId].J.cols(),
                                             taskLib[curId].J.cols());
+            }
+            // std::cout << taskLib[curId].taskName << std::endl;
+            // CostomUtils::print_matrix(taskLib[curId].J, "J");
+            // CostomUtils::print_matrix(taskLib[curId].N, "N");
             taskLib[curId].Jpre = taskLib[curId].J * taskLib[curId].N;
             taskLib[curId].delta_q =
                 pseudoInv_right_weighted(taskLib[curId].Jpre,taskLib[curId].W) *

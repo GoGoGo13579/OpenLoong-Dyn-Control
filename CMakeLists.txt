@@ -4,6 +4,9 @@ project(openloong-dyn-control)
 IF (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE release) 
 ENDIF ()
+# IF (NOT CMAKE_BUILD_TYPE)
+#     set(CMAKE_BUILD_TYPE debug) 
+# ENDIF ()
 add_compile_options(-std=c++17)
 
 #系统eigen版本可能老旧，使用自供eigen

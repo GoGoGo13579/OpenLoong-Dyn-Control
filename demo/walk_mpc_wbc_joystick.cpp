@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     // WBC_priority WBC_solv(kinDynSolver.model_nv, 18, 22, 0.7, mj_model->opt.timestep); // WBC solver
     CostomAlgorithm::WBC_priority 
         WBC_solv(mj_model->opt.timestep, RobotState.model_nv);
-    // WBC_solv.setMode(CostomAlgorithm::WBCMode::SoftContactMode);
+    WBC_solv.setMode(CostomAlgorithm::WBCMode::SoftContactMode);
     // MPC MPC_solv(dt_200Hz);                                                           // mpc controller
     CostomAlgorithm::MPC MPC_solv(dt_200Hz);
     GaitScheduler gaitScheduler(0.4, mj_model->opt.timestep);                          // gait scheduler
@@ -362,17 +362,17 @@ int main(int argc, char **argv)
                     pvtCtr.setJointPD(300 * kp, 16 * kd, "J_ankle_r_roll");
                 } else if (WBC_solv.getMode() == 
                            CostomAlgorithm::WBCMode::SoftContactMode) {
-                    double kp = 1.3;
+                    double kp = 1.2;
                     double kd = 1.0;
     
-                    pvtCtr.setJointPD(300 * kp, 15 * kd, "J_hip_l_roll");
+                    pvtCtr.setJointPD(300 * kp, 17 * kd, "J_hip_l_roll");
                     pvtCtr.setJointPD(200 * kp, 10 * kd, "J_hip_l_yaw");
                     pvtCtr.setJointPD(300 * kp, 10 * kd, "J_hip_l_pitch");
                     pvtCtr.setJointPD(400 * kp, 14 * kd, "J_knee_l_pitch");
                     pvtCtr.setJointPD(400 * kp, 18 * kd, "J_ankle_l_pitch");
                     pvtCtr.setJointPD(300 * kp, 16 * kd, "J_ankle_l_roll");
     
-                    pvtCtr.setJointPD(300 * kp, 15 * kd, "J_hip_r_roll");
+                    pvtCtr.setJointPD(300 * kp, 17 * kd, "J_hip_r_roll");
                     pvtCtr.setJointPD(200 * kp, 10 * kd, "J_hip_r_yaw");
                     pvtCtr.setJointPD(300 * kp, 10 * kd, "J_hip_r_pitch");
                     pvtCtr.setJointPD(400 * kp, 14 * kd, "J_knee_r_pitch");
